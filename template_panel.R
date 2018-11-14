@@ -89,3 +89,6 @@ template.panel.server <- substitute({
     datafile()
     })
 })
+
+# call this function to add your server logic
+ADD_SERVER_LOGIC(template.panel.server)
