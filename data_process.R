@@ -15,6 +15,158 @@ debug_load_test_dataset <- function() {
   return(json)
 }
 
+LANE.CREEPS <- c("npc_dota_creep_badguys_melee",
+                 "npc_dota_creep_badguys_melee_diretide",
+                 "npc_dota_creep_badguys_melee_upgraded",
+                 "npc_dota_creep_badguys_ranged",
+                 "npc_dota_creep_badguys_ranged_diretide",
+                 "npc_dota_creep_badguys_ranged_upgraded",
+                 "npc_dota_creep_goodguys_melee",
+                 "npc_dota_creep_goodguys_melee_diretide",
+                 "npc_dota_creep_goodguys_melee_upgraded",
+                 "npc_dota_creep_goodguys_ranged",
+                 "npc_dota_creep_goodguys_ranged_diretide",
+                 "npc_dota_creep_goodguys_ranged_upgraded")
+
+NEUTRAL.CREEPS <-c("npc_dota_neutral_alpha_wolf",
+                   "npc_dota_neutral_centaur_khan",
+                   "npc_dota_neutral_centaur_outrunner",
+                   "npc_dota_neutral_dark_troll_warlord",
+                   "npc_dota_neutral_fel_beast",
+                   "npc_dota_neutral_ghost",
+                   "npc_dota_neutral_giant_wolf",
+                   "npc_dota_neutral_harpy_scout",
+                   "npc_dota_neutral_harpy_storm",
+                   "npc_dota_neutral_polar_furbolg_champion",
+                   "npc_dota_neutral_polar_furbolg_ursa_warrior",
+                   "npc_dota_neutral_dark_troll",
+                   "npc_dota_neutral_forest_troll_berserker",
+                   "npc_dota_neutral_forest_troll_high_priest",
+                   "npc_dota_neutral_kobold",
+                   "npc_dota_neutral_kobold_tunneler",
+                   "npc_dota_neutral_kobold_taskmaster",
+                   "npc_dota_neutral_mud_golem",
+                   "npc_dota_neutral_ogre_mauler",
+                   "npc_dota_neutral_ogre_magi",
+                   "npc_dota_neutral_satyr_trickster",
+                   "npc_dota_neutral_satyr_soulstealer",
+                   "npc_dota_neutral_satyr_hellcaller",
+                   "npc_dota_neutral_gnoll_assassin",
+                   "npc_dota_neutral_wildkin",
+                   "npc_dota_neutral_enraged_wildkin")
+
+NECRONOMICON.CREEPS <- c("npc_dota_necronomicon_archer_1",
+                         "npc_dota_necronomicon_archer_2",
+                         "npc_dota_necronomicon_archer_3",
+                         "npc_dota_necronomicon_warrior_1",
+                         "npc_dota_necronomicon_warrior_2",
+                         "npc_dota_necronomicon_waarrior_3")
+
+ANCIENT.CREEPS <- c("npc_dota_neutral_black_drake",
+                    "npc_dota_neutral_black_dragon",
+                    "npc_dota_neutral_blue_dragonspawn_sorcerer",
+                    "npc_dota_neutral_blue_dragonspawn_overseer",
+                    "npc_dota_neutral_granite_golem",
+                    "npc_dota_neutral_elder_jungle_stalker",
+                    "npc_dota_neutral_prowler_acolyte",
+                    "npc_dota_neutral_prowler_shaman",
+                    "npc_dota_neutral_rock_golem",
+                    "npc_dota_neutral_small_thunder_lizard",
+                    "npc_dota_neutral_jungle_stalker",
+                    "npc_dota_neutral_big_thunder_lizard",
+                    "npc_dota_roshan")
+
+###############################################################################
+# internal process functions
+#   Contains function that are used by other functions in data_process.R
+###############################################################################
+process_kills <- function(killed, creeps = c()) {
+  kills <- 0
+  for (creep in creeps) {
+    if (!is.null(killed[[creep]]) && !is.na(killed[[creep]])) {
+      kills <- kills + as.integer(killed[[creep]])
+    }
+  }
+  
+  return(kills)
+}
+
+process_match_player_data <- function(player, match.duration) {
+  player.data <- list()
+  
+  player.data$account.id <- player$account_id #y
+  player.data$name <- player$name
+  player.data$persona.name <- player$personaname
+  player.data$region <- player$region
+  player.data$player.slot <- player$player_slot #y
+  player.data$is.radiant <- ifelse(!is.null(player$isRadiant),
+                                   player$isRadiant, player$player_slot < 128)
+  player.data$hero.id <- player$hero_id #y
+  player.data$level <- player$level #y
+  player.data$lane <- player$lane #y
+  player.data$lane.role <- player$lane_role #y
+  player.data$item0 <- player$item_0 #y
+  player.data$item1 <- player$item_1 #y
+  player.data$item2 <- player$item_2 #y
+  player.data$item3 <- player$item_3 #y
+  player.data$item4 <- player$item_4 #y
+  player.data$item5 <- player$item_5 #y
+  player.data$backpack0 <- player$backpack_0 #y
+  player.data$backpack1 <- player$backpack_1 #y
+  player.data$backpack2 <- player$backpack_2 #y
+  player.data$firstblood.claimed <- player$firstblood_claimed #y
+  player.data$kills <- player$kills #y
+  player.data$deaths <- player$deaths #y
+  player.data$assists <- player$assists #y
+  player.data$kda <- ifelse(!is.null(player$kda), player$kda,
+                            (player$kills + player$assists) / max(1, player$deaths))
+  player.data$total.gold <- ifelse(!is.null(player$total_gold), player$total_gold,
+                                   as.integer(player$gold_per_min * match.duration / 60))
+  player.data$gold <- player$gold #y
+  player.data$gold.spent <- player$gold_spent #y
+  player.data$gold.per.min <- player$gold_per_min #y
+  player.data$total.xp <- ifelse(!is.null(player$total_xp), player$total_xp,
+                                 as.integer(player$xp_per_min * match.duration / 60))
+  player.data$xp_per_min <- player$xp_per_min #y
+  player.data$actions_per_min <- ifelse(!is.null(player$actions_per_min), player$actions_per_min,
+                                        as.integer(rowSums(player$actions, na.rm = T) * 60 / match.duration))
+  player.data$last.hits <- player$last_hits #y
+  player.data$denies <- player$denies #y
+  player.data$lane.kills <- ifelse(!is.null(player$lane_kills), player$lane_kills,
+                                   process_kills(player$killed, LANE.CREEPS))
+  player.data$hero.kills <- ifelse(!is.null(player$hero_kills), player$hero_kills, player$kills)
+  player.data$neutral.kills <- ifelse(!is.null(player$neutral_kills), player$neutral_kills,
+                                      process_kills(player$killed, NEUTRAL.CREEPS))
+  player.data$tower.kills <- ifelse(!is.null(player$tower_kills), player$tower_kills, player$towers_killed)
+  player.data$courier.kills <- ifelse(!is.null(player$courier_kills), player$courier_kills,
+                                      ifelse(is.null(player$killed$npc_dota_courier) || is.na(player$killed$npc_dota_courier),
+                                             0, player$killed$npc_dota_courier))
+  player.data$necronomicon.kills <- ifelse(!is.null(player$necronomicon_kills), player$necronomicon_kills,
+                                           process_kills(player$killed, NECRONOMICON.CREEPS)) 
+  player.data$ancient.kills <- ifelse(!is.null(player$ancient_kills), player$ancient_kills,
+                                      process_kills(player$killed, ANCIENT.CREEPS))
+  player.data$sentry.kills <- ifelse(!is.null(player$sentry_kills), player$sentry_kills,
+                                     ifelse(is.na(player$killed$npc_dota_sentry_wards) || is.na(player$killed$npc_dota_sentry_wards),
+                                            0, player$killed$npc_dota_sentry_wards))
+  player.data$observer.kills <- ifelse(!is.null(player$observer_kills), player$observer_kills,
+                                       ifelse(is.null(player$killed$npc_dota_observer_wards) || is.na(player$killed$npc_dota_observer_wards),
+                                              0, player$killed$npc_dota_observer_wards))
+  player.data$roshan.kills <- ifelse(!is.null(player$roshan_kills), player$roshan_kills, player$roshans_killed)
+  player.data$stuns <- player$stuns #y
+  player.data$purchase.log <- data.table::rbindlist(player$purchase_log, fill = T) #y
+  player.data$runes.log <- data.table::rbindlist(player$runes_log, fill = T) #y
+  player.data$metrics_t <- data.frame(min = 1:length(player$gold_t),
+                                      gold_t = unlist(player$gold_t), #y
+                                      xp_t = unlist(player$xp_t), #y
+                                      lh_t = unlist(player$lh_t), #y
+                                      dn_t = unlist(player$dn_t)) #y
+  player.data$abilities.upgrade <- data.frame(level = 1:length(player$ability_upgrades_arr), #y
+                                              ability = unlist(player$ability_upgrades_arr))
+  
+  return(player.data)
+}
+
+
 ###############################################################################
 # additional api functions
 #   Contains function that are not implemented in the ROpenDota package but
@@ -73,7 +225,7 @@ get_by_sql <- function (sql) {
 
 get_pro_matches <- function (limit = 100, less_than_match_id = NULL) {
   prefix <- "https://api.opendota.com/api/proMatches"
-
+  
   ret <- data.frame()
   while (nrow(ret) < limit) {
     url <- prefix
@@ -129,15 +281,18 @@ get_team_players <- function(team_id) {
 get_match_data <- function(match.id) {
   if (use.dpc) {
     #match.id = "3497210298"
-    match <- json[[match.id]]
+    match <- json[[as.character(match.id)]]
   } else {
     match <- ROpenDota::get_match_details(match.id)
+    if (is.null(match) || is.na(match)) {
+      return(NULL)
+    }
   }
   
   match.list.names <- names(match)
-  match.data <- c()
-
-  match.data$match.id <- strtoi(match.id)
+  match.data <- list()
+  
+  match.data$match.id <- as.character(match.id)
   match.data$start.time <- ymd_hms(as.POSIXct(match$start, origin = "1970-01-01"))
   match.data$duration <- match$duration
   match.data$region <- match$region
@@ -187,80 +342,64 @@ get_match_data <- function(match.id) {
 
 get_match_players <- function (match.id) {
   if (use.dpc) {
-    #match.id = "3497210298"
-    match <- json[[match.id]]
+    match.id = "3497210298"
+    match <- json[[as.character(match.id)]]
   } else {
     match <- ROpenDota::get_match_details(match.id)
+    if (is.null(match) || is.na(match)) {
+      return(NULL)
+    }
   }
   
-  match.players <- c()
-  match.players.len <- length(match$players)
+  match.players <- list()
+  if (use.dpc) {
+    match.players.len <- length(match$players)
+  } else {
+    match.players.len <- nrow(match$players)
+  }
   for (i in 1:match.players.len) {
-    player.data <- c()
     if (use.dpc) {
       player <- match$players[[i]]
     } else {
       player <- match$players[i,]
     }
     
-    player.data$account.id <- player$account_id
-    player.data$name <- player$name
-    player.data$persona.name <- player$personaname
-    player.data$region <- player$region
-    player.data$is.radiant <- player$isRadiant
-    player.data$player.slot <- player$player_slot
-    player.data$hero.id <- player$hero_id
-    player.data$level <- player$level
-    player.data$lane <- player$lane
-    player.data$lane.role <- player$lane_role
-    player.data$item0 <- player$item_0
-    player.data$item1 <- player$item_1
-    player.data$item2 <- player$item_2
-    player.data$item3 <- player$item_3
-    player.data$item4 <- player$item_4
-    player.data$item5 <- player$item_5
-    player.data$backpack0 <- player$backpack_0
-    player.data$backpack1 <- player$backpack_1
-    player.data$backpack2 <- player$backpack_2
-    player.data$firstblood.claimed <- player$firstblood_claimed
-    player.data$kills <- player$kills
-    player.data$deaths <- player$deaths
-    player.data$assists <- player$assists
-    player.data$kda <- player$kda
-    player.data$total.gold <- player$total_gold
-    player.data$gold <- player$gold
-    player.data$gold.spent <- player$gold_spent
-    player.data$gold.per.min <- player$gold_per_min
-    player.data$total.xp <- player$total_xp
-    player.data$xp_per_min <- player$xp_per_min
-    player.data$actions_per_min <- player$actions_per_min
-    player.data$last.hits <- player$last_hits
-    player.data$denies <- player$denies
-    player.data$lane.kills <- player$lane_kills
-    player.data$hero.kills <- player$hero_kills
-    player.data$neutral.kills <- player$neutral_kills
-    player.data$tower.kills <- player$tower_kills
-    player.data$courier.kills <- player$courier_kills
-    player.data$necronomicon.kills <- player$necronomicon_kills
-    player.data$ancient.kills <- player$ancient_kills
-    player.data$sentry.kills <- player$sentry_kills
-    player.data$observer.kills <- player$observer_kills
-    player.data$roshan.kills <- player$roshan_kills
-    player.data$stuns <- player$stuns
-    player.data$purchase.log <- data.table::rbindlist(player$purchase_log, fill = T)
-    player.data$runes.log <- data.table::rbindlist(player$runes_log, fill = T)
-    player.data$metrics_t <- data.frame(min = 1:length(player$gold_t),
-                                        gold_t = unlist(player$gold_t),
-                                        xp_t = unlist(player$xp_t),
-                                        lh_t = unlist(player$lh_t),
-                                        dn_t = unlist(player$dn_t))
-    player.data$abilities.upgrade <- data.frame(level = 1:length(player$ability_upgrades_arr),
-                                                ability = unlist(player$ability_upgrades_arr))
-    
-    match.players[i] <- player.data
+    player.data <- process_match_player_data(player, match$duration)
+    match.players[[i]] <- player.data
   }
   
   return(match.players)
+}
+
+get_player_match_details <- function (account.id, limit = 100, earlier.than.date = NULL) {
+  sql <- "SELECT player_matches.*, matches.start_time, matches.duration FROM player_matches LEFT JOIN matches ON player_matches.match_id = matches.match_id"
+  sql <- paste(sql, "WHERE player_matches.account_id =", account.id)
+  
+  if (!is.null(earlier.than.date)) {
+    earlier.than.date <- ymd_hms(earlier.than.date)
+    if (is.na(earlier.than.date)) {
+      print("earlier.than.date is not a valid date")
+      return(NULL)
+    }
+    earlier.than.date <- as.numeric(earlier.than.date)
+    sql <- paste(sql, "AND matches.start_time <=", earlier.than.date)
+  }
+  sql <- paste(sql, "ORDER BY start_time DESC")
+  
+  limit <- max(0, limit)
+  if (limit > 0) {
+    sql <- paste(sql, "LIMIT", limit)
+  }
+  
+  print(sql)
+  out <- get_by_sql(sql)
+  
+  player.match.details <- list()
+  for(i in 1:nrow(out$rows)) {
+    player.match.details[[i]] <- process_match_player_data(out$rows[1,], out$rows$duration)
+  }
+  
+  return(player.match.details)
 }
 
 if (use.dpc) {
