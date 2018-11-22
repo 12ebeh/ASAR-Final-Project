@@ -396,7 +396,7 @@ get_player_match_details <- function (account.id, limit = 100, earlier.than.date
   
   player.match.details <- list()
   for(i in 1:nrow(out$rows)) {
-    player.match.details[[i]] <- process_match_player_data(out$rows[1,], out$rows$duration)
+    player.match.details[[i]] <- process_match_player_data(out$rows[i,], out$rows$duration)
   }
   
   return(player.match.details)
