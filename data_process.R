@@ -155,13 +155,21 @@ process_match_player_data <- function(player, match.duration) {
   player.data$stuns <- player$stuns #y
   player.data$purchase.log <- data.table::rbindlist(player$purchase_log, fill = T) #y
   player.data$runes.log <- data.table::rbindlist(player$runes_log, fill = T) #y
-  player.data$metrics_t <- data.frame(min = 1:length(player$gold_t),
-                                      gold_t = unlist(player$gold_t), #y
-                                      xp_t = unlist(player$xp_t), #y
-                                      lh_t = unlist(player$lh_t), #y
-                                      dn_t = unlist(player$dn_t)) #y
-  player.data$abilities.upgrade <- data.frame(level = 1:length(player$ability_upgrades_arr), #y
-                                              ability = unlist(player$ability_upgrades_arr))
+  gold.t.len <- length(unlist(player$gold_t))
+  xp.t.len <- length(unlist(player$xp_t))
+  lh.t.len <- length(unlist(player$lh_t))
+  dn.t.len <-  length(unlist(player$dn_t))
+  metrics.len <- max(gold.t.len, xp.t.len, lh.t.len, dn.t.len)
+  player.data$metrics_t <- data.frame(min = 1:metrics.len,
+                                      gold_t = ifelse(gold.t.len > 0, unlist(player$gold_t), rep(0, gold.t.len)) , #y
+                                      xp_t = ifelse(xp.t.len > 0, unlist(player$xp_t), rep(0, xp.t.len)), #y
+                                      lh_t = ifelse(lh.t.len > 0, unlist(player$lh_t), rep(0, lh.t.len)), #y
+                                      dn_t = ifelse(dn.t.len > 0, unlist(player$dn_t), rep(0, dn.t.len))) #y
+  abilities.upgrades.len <- length(unlist(player$ability_upgrades_arr))
+  player.data$abilities.upgrade <- data.frame(level = 1:abilities.upgrades.len, #y
+                                              ability = ifelse(abilities.upgrades.len > 0,
+                                                               unlist(player$ability_upgrades_arr),
+                                                               rep(0, abilities.upgrades.len)))
   
   return(player.data)
 }
@@ -223,19 +231,19 @@ get_by_sql <- function (sql) {
   return(out)
 }
 
-get_pro_matches <- function (limit = 100, less_than_match_id = NULL) {
+get_pro_matches <- function (limit = 100, less.than.match.id = NULL) {
   prefix <- "https://api.opendota.com/api/proMatches"
   
   ret <- data.frame()
   while (nrow(ret) < limit) {
     url <- prefix
-    if (!is.null(less_than_match_id )) {
-      url <- paste(prefix, "?less_than_match_id=", less_than_match_id, sep = "")
+    if (!is.null(less.than.match.id )) {
+      url <- paste(prefix, "?less_than_match_id=", less.than.match.id, sep = "")
     }
     
     out <- get_url_internal(url)
     
-    less_than_match_id <- out$match_id[nrow(out)]
+    less.than.match.id <- out$match_id[nrow(out)]
     ret <- rbind(ret, out)
   }
   
@@ -244,11 +252,11 @@ get_pro_matches <- function (limit = 100, less_than_match_id = NULL) {
   return(ret)
 }
 
-get_teams <- function(team_id = NULL) {
+get_teams <- function(team.id = NULL) {
   prefix <- "https://api.opendota.com/api/teams"
   url <- prefix
-  if (!is.null(team_id)) {
-    url <- paste(prefix, "/", team_id, sep = "")
+  if (!is.null(team.id)) {
+    url <- paste(prefix, "/", as.character(team.id), sep = "")
   }
   
   out <- get_url_internal(url)
@@ -256,17 +264,42 @@ get_teams <- function(team_id = NULL) {
   return(out)
 }
 
-get_team_matches <- function(team_id) {
-  prefix <- "https://api.opendota.com/api/teams/"
-  url <- paste(prefix, team_id, "/matches", sep = "")
+get_player <- function (account.id) {
+  prefix <- "https://api.opendota.com/api/players/"
+  url <- paste(prefix, account.id, sep = "")
   out <- get_url_internal(url)
   
   return(out)
 }
 
-get_team_players <- function(team_id) {
+get_pro_players <- function (account.id = NULL) {
+  prefix <- "https://api.opendota.com/api/proPlayers"
+  #url <- paste(prefix, account.id, sep = "")
+  out <- get_url_internal(prefix)
+  
+  if (!is.null(account.id)) {
+    out <- filter(out, account_id == account.id)
+  }
+  
+  if (nrow(out) == 0) {
+    print(paste("Pro player with account id", account.id, "not found."))
+    return(NULL)
+  }
+  
+  return(out)
+}
+
+get_team_matches <- function(team.id) {
   prefix <- "https://api.opendota.com/api/teams/"
-  url <- paste(prefix, team_id, "/players", sep = "")
+  url <- paste(prefix, team.id, "/matches", sep = "")
+  out <- get_url_internal(url)
+  
+  return(out)
+}
+
+get_team_players <- function(team.id) {
+  prefix <- "https://api.opendota.com/api/teams/"
+  url <- paste(prefix, team.id, "/players", sep = "")
   out <- get_url_internal(url)
   
   return(out)

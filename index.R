@@ -32,9 +32,10 @@ ADD_SERVER_LOGIC <- function(new.logic) {
   SERVER.LOGIC[[(length(SERVER.LOGIC) + 1)]] <<- new.logic
 }
 
-source("template_panel.R", local = T)
-source("teams_panel.R", local = T)
-source("player.R", local = T)
+#source("template_panel.R", local = T)
+#source("teams_panel.R", local = T)
+source("player_panel.R", local = T)
+
 
 ###############################################################################
 # Page UI
