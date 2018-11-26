@@ -13,54 +13,36 @@ teams_search_input <- function (namespace) {
   # Namespace is absolutely required, DO NOT REMOVE!!
   ns <- NS(namespace)
   
-  tagList(
-    textInput(ns("team_id"), label = "Team ID"),
-    actionButton(ns("team_search"), label = "Team Search")
-    )
-}
-
-teams_variable_select <- function(namespace) {
-  # Namespace is absolutely required, DO NOT REMOVE!!
-  ns <- NS(namespace)
-  
-  # Your component UI code here, currently using the file import module code
-  # from the tutorial
-  tagList(
-    column(2, h2("Variables"), tags$ul(
-      actionButton(ns("Variable1"), "Variable 1"),
-      actionButton(ns("Variable2"), "Variable 2")
-    )),
-    column(3, h2("Control Panel"), uiOutput(ns("controlUI"))),
-    column(7, h2("Graphical Plot"))
+  column(12, div(
+    div(uiOutput(ns("teams.list"))),
+    div(actionButton(ns("team.search"), label = "Team Search")))
   )
 }
 
 ###############################################################################
 # Panel's Server Modules
 ###############################################################################
-teams_variable <- function(input, output, session) {
-  v <- reactiveValues(
-    action.ui = NULL
-  )
+team_search <- function(input, output, session, team.profile) {
+  ns <- session$ns
   
-  observeEvent(input$Variable1, {
-    v$action.ui <- sliderInput("new_slider", label = "Variable 1 Slider", 1, 10, 5)
+  #observeEvent(input$team.search {
+    
+  #})
+  
+  teams_df <- reactive({
+    teams <- get_teams()
+    return(teams)
   })
   
-  observeEvent(input$Variable2, {
-    v$action.ui <- selectInput("new_select", label = "Variable 2 Select",
-                               choices = c("Choice 1" = "choice1",
-                                           "Choice 2" = "choice2"))
+  output$teams.list <- renderUI({
+    
+    div(
+      div(style = "display: inline-block; vertical-align:top;", selectInput(ns("team.id"), "Team ID", as.list(teams_df())))
+      #div(style = "display: inline-block; vertical-align:top;", textInput(ns("last.match.count"), "Number of Match to Retrieve", value = 30))
+    )
   })
   
-  output$controlUI <- renderUI({
-    if (is.null(v$action.ui)) {
-      return()
-    }
-    v$action.ui
-  })
 }
-
 
 ###############################################################################
 # Add Panel into the list of panels to be displayed
@@ -68,8 +50,11 @@ teams_variable <- function(input, output, session) {
 # define the tab panel components
 teams.panel <- tabPanel(
   title = "Teams",
-  fluidRow(teams_search_input(PANEL.NAMESPACE)),
-  fluidRow(teams_variable_select(PANEL.NAMESPACE))
+  fluidRow(
+    column(3, teams_search_input(PANEL.NAMESPACE)),
+    column(9, {})
+  )
+  #fluidRow(teams_variable_select(PANEL.NAMESPACE))
 )
 
 # call this function to add the tab panel
@@ -80,8 +65,14 @@ ADD_PANEL(teams.panel)
 # Add Panel into the list of panels to be displayed
 ###############################################################################
 team.panel.server <- substitute({
+  team.profile <- reactiveValues(
+    basic.data = list(),
+    team.members = list(),
+    team.matches = list()
+  )
+  
   # TODO: Add the panel's server code here
-  callModule(teams_variable, PANEL.NAMESPACE)
+  callModule(team_search, PANEL.NAMESPACE, team.profile)
   
   
   
