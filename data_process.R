@@ -91,7 +91,7 @@ process_kills <- function(killed, creeps = c()) {
   return(kills)
 }
 
-process_match_player_data <- function(player, match.starttime, match.duration, match.radiant.win) {
+process_match_player_data <- function(player, match.duration) {
   player.data <- list()
   
   player.data$account.id <- player$account_id #y
@@ -101,10 +101,6 @@ process_match_player_data <- function(player, match.starttime, match.duration, m
   player.data$player.slot <- player$player_slot #y
   player.data$is.radiant <- ifelse(!is.null(player$isRadiant),
                                    player$isRadiant, player$player_slot < 128)
-  player.data$is.win <- ifelse(!is.null(player$win), player$win, (!match.radiant.win && !player.data$is.radiant) || (match.radiant.win && player.data$is.radiant))
-  player.data$start.time <- ifelse(!is.null(player$start_time), player$start_time, match.starttime)
-  player.data$start.time <- ymd_hms(as.POSIXct(player.data$start.time, origin = "1970-01-01"))
-  player.data$duration <- ifelse(!is.null(player$duration), player$duration, match.duration)
   player.data$hero.id <- player$hero_id #y
   player.data$level <- player$level #y
   player.data$lane <- player$lane #y
@@ -330,7 +326,7 @@ get_match_data <- function(match.id) {
   match.data <- list()
   
   match.data$match.id <- as.character(match.id)
-  match.data$start.time <- ymd_hms(as.POSIXct(match$start_time, origin = "1970-01-01"))
+  match.data$start.time <- ymd_hms(as.POSIXct(match$start, origin = "1970-01-01"))
   match.data$duration <- match$duration
   match.data$region <- match$region
   match.data$patch <- match$patch
@@ -401,8 +397,7 @@ get_match_players <- function (match.id) {
       player <- match$players[i,]
     }
     
-    player.data <- process_match_player_data(player, match$start_time, match$duration, match$radiant_win)
-    player.data$is.win <- player.data
+    player.data <- process_match_player_data(player, match$duration)
     match.players[[i]] <- player.data
   }
   
@@ -410,7 +405,7 @@ get_match_players <- function (match.id) {
 }
 
 get_player_match_details <- function (account.id, limit = 100, earlier.than.date = NULL) {
-  sql <- "SELECT player_matches.*, matches.start_time, matches.duration, matches.radiant_win FROM player_matches LEFT JOIN matches ON player_matches.match_id = matches.match_id"
+  sql <- "SELECT player_matches.*, matches.start_time, matches.duration FROM player_matches LEFT JOIN matches ON player_matches.match_id = matches.match_id"
   sql <- paste(sql, "WHERE player_matches.account_id =", account.id)
   
   if (!is.null(earlier.than.date)) {
@@ -434,7 +429,7 @@ get_player_match_details <- function (account.id, limit = 100, earlier.than.date
   
   player.match.details <- list()
   for(i in 1:nrow(out$rows)) {
-    player.match.details[[i]] <- process_match_player_data(out$rows[i,], out$rows$start_time, out$rows$duration, out$rows$radiant_win)
+    player.match.details[[i]] <- process_match_player_data(out$rows[i,], out$rows$duration)
   }
   
   return(player.match.details)
