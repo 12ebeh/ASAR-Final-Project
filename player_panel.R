@@ -28,21 +28,35 @@ player_match_metics_table_Input <- function(namespace) {
   uiOutput(ns("player.basic.match.metrics"))
 }
 
-player_match_metrics_plot_Input <- function(namespace) {
+#player_match_metrics_plot_Input <- function(namespace) {
+#  # Namespace is absolutely required, DO NOT REMOVE!!
+#  ns <- NS(namespace)
+  
+#  tagList(
+#    uiOutput(ns("player.match.metrics.control")),
+#    plotOutput(ns("player.basic.match.metrics.plot"))
+#  )
+#}
+
+player_match_metrics_by_hero_Input <- function(namespace) {
   # Namespace is absolutely required, DO NOT REMOVE!!
   ns <- NS(namespace)
   
   tagList(
-    uiOutput(ns("player.match.metrics.control")),
-    plotOutput(ns("player.basic.match.metrics.plot"))
+    uiOutput(ns("player.basic.match.metrics.by.hero.control")),
+    plotOutput(ns("player.basic.match.metrics.by.hero.plot")),
+    hr()
   )
 }
 
-player_match_metrics_summary_Input <- function(namespace) {
-  # Namespace is absolutely required, DO NOT REMOVE!!
+player_match_metrics_by_hero_time_series_Input <- function(namespace) {
   ns <- NS(namespace)
   
-  
+  tagList(
+    uiOutput(ns("player.basic.match.metrics.time.series.control")),
+    plotOutput(ns("player.basic.match.metrics.time.series.plot")),
+    hr()
+  )
 }
 
 ###############################################################################
@@ -54,10 +68,10 @@ player_metrics <- function(input, output, session, player.profile) {
   output$pro.player.metrics <- renderUI({
     if (length(player.profile$pro.data) > 0) {
       tagList(
-        h3(player.profile$pro.data$personname),
-        h4(paste("Team Name:", player.profile$pro.data$team.name)),
+        h3(player.profile$pro.data$personname, style = "display:inline;"),
+        a("Profile URL", href = player.profile$pro.data$profile.url, style = "display:inline;"),
         p(paste("Country:", player.profile$pro.data$countrycode)),
-        a("Profile URL", href = player.profile$pro.data$profile.url)
+        h5(paste("Team:", player.profile$pro.data$team.name))
       )
     }
   })
@@ -98,27 +112,97 @@ player_match_metics_table <- function(input, output, session, player.profile) {
   }, options = list(scrollX=T, pageLength=20))
 }
 
-player_match_metics_plot <- function(input, output, session, player.profile) {
+player_basic_match_metrics_by_hero <- function(input, output, session, player.profile) {
   ns <- session$ns
   
-  output$player.match.metrics.control <- renderUI({
-    if (length(player.profile$match.data) > 0) {
-      metric.names <- colnames(player.profile$match.data$basic.metrics)
+  df_by_hero <- reactive({
+    # TODO: Add more metrics here
+    if (length(player.profile$match.data) > 0 ) {
+      df <- player.profile$match.data$basic.metrics %>%
+        group_by(hero.id) %>%
+        summarise(win.rate = sum(is.win) / n(),
+                  average.level = mean(level),
+                  average.kills = mean(kills),
+                  average.deaths = mean(deaths),
+                  average.assists = mean(assists))
+      
+      #df.names <- colnames(df)
+      #print(df)
+      
+      df %>% gather(metric, value, "win.rate", average.level, average.kills, average.deaths, average.assists)
+    }
+  })
   
+  output$player.basic.match.metrics.by.hero.control <- renderUI({
+    if (length(player.profile$match.data) > 0) {
+      df <- df_by_hero()
+      metric.names <- unique(df$metric)
+      print(metric.names)
+
       div(
+        h3("Match Metrics by Hero"),
         div(style = "display: inline-block; vertical-align:top;",
-            selectInput(ns("metric.select"), "Select Metric", choices = metric.names[-c(1:3,5:16)])),
-        div(style = "display: inline-block; vertical-align:top;",
-            sliderInput(ns("metric.bin.size"), "Bin Size", 1, 50, 5))
+            selectInput(ns("metric.select"), "Select Metric", choices = metric.names))
       )
     }
   })
   
-  output$player.basic.match.metrics.plot <- renderPlot({
+  output$player.basic.match.metrics.by.hero.plot <- renderPlot({
+    if (length(player.profile$match.data) > 0 && !is.null(input$metric.select)) {
+      #print(head(player.profile$match.data$basic.metrics))
+      df_by_hero() %>% 
+        filter(metric == input$metric.select) %>%
+        ggplot() +
+        geom_col(aes(x = as.factor(hero.id), y = value))
+    }
+  })
+}
+
+player_match_metrics_by_hero_time_series <- function (input, output, session, player.profile) {
+  ns <- session$ns
+  
+  df.ts <- reactive({
+    # TODO: Add more metrics
     if (length(player.profile$match.data) > 0) {
-      print(head(player.profile$match.data$basic.metrics))
-      ggplot(player.profile$match.data$basic.metrics) +
-        geom_histogram(aes_string(x = as.character(input$metric.select)), binwidth = as.integer(input$metric.bin.size))
+      player.profile$match.data$basic.metrics %>%
+        group_by(hero.id) %>%
+        arrange(hero.id, start.time) %>%
+        mutate(time.id = 1:n()) %>%
+        select(hero.id, start.time, kills, deaths, assists, time.id) %>%
+        gather(metric, value, kills, deaths, assists)
+    }
+  })
+  
+  output$player.basic.match.metrics.time.series.control <- renderUI({
+    if (length(player.profile$match.data) > 0) {
+      df <- df.ts()
+      hero.list <- unique(df$hero.id)
+      metrics.list <- unique(df.ts()$metric)
+      div(
+        div(style = "display:inline-block; vertical-align:top;", 
+            selectInput(ns("ts.hero.select"), label = "Select Hero", choices = hero.list)),
+        div(style = "display:inline-block; vertical-align:top;",
+            selectInput(ns("ts.metric.select"), label = "Select Metric", choices = metrics.list))
+      )
+    }
+  })
+  
+  output$player.basic.match.metrics.time.series.plot <- renderPlot({
+    print(input$ts.hero.select)
+    print(input$ts.metric.select)
+    if (length(player.profile$match.data) > 0 && !is.null(input$ts.hero.select) && !is.null(input$ts.metric.select)) {
+      df <- df.ts() %>%
+        filter(hero.id == as.integer(input$ts.hero.select), metric == input$ts.metric.select)
+      
+      p <- ggplot(df) +
+        geom_point(aes(x = as.factor(start.time), y = value)) +
+        xlab("Date Played") + ylab(input$ts.metric.select)
+      
+      if (nrow(df) > 1) {
+        p <- p + geom_line(aes(x = as.factor(start.time), y = value, group = 1))
+      }
+      
+      p
     }
   })
 }
@@ -135,7 +219,8 @@ player.panel <- tabPanel(
            actionButton("search", "Search")),
     column(9, h2("Player Information"), 
            player_metrics_Input(PANEL.NAMESPACE),
-           player_match_metrics_plot_Input(PANEL.NAMESPACE),
+           player_match_metrics_by_hero_Input(PANEL.NAMESPACE),
+           player_match_metrics_by_hero_time_series_Input(PANEL.NAMESPACE),
            player_match_metics_table_Input(PANEL.NAMESPACE))
            
   )
@@ -196,16 +281,18 @@ player.panel.server <- substitute({
     player.profile$match.data <- list()
     if (!is.null(player.matches)) {
       player.matches.names <- names(player.matches[[1]])
+      print(player.matches.names)
       player.matches.df <- data.table::rbindlist(lapply(player.matches, function (x) {
-        x[player.matches.names[2:37]]
+        x[player.matches.names[2:44]]
       }))
       player.profile$match.data$basic.metrics <- player.matches.df
     }
   })
   
   callModule(player_metrics, PANEL.NAMESPACE, player.profile)
+  callModule(player_basic_match_metrics_by_hero, PANEL.NAMESPACE, player.profile)
+  callModule(player_match_metrics_by_hero_time_series, PANEL.NAMESPACE, player.profile)
   callModule(player_match_metics_table, PANEL.NAMESPACE, player.profile)
-  callModule(player_match_metics_plot, PANEL.NAMESPACE, player.profile)
 })
 
 # call this function to add your server logic
