@@ -9,55 +9,144 @@ PANEL.NAMESPACE <- "teams"
 ###############################################################################
 # Panel's UI Modules
 ###############################################################################
-teams_search_input <- function (namespace) {
+teams_search_Input <- function (namespace) {
   # Namespace is absolutely required, DO NOT REMOVE!!
   ns <- NS(namespace)
   
   tagList(
-    textInput(ns("team_id"), label = "Team ID"),
-    actionButton(ns("team_search"), label = "Team Search")
-    )
+    uiOutput(ns("teams.list")),
+    actionButton(ns("team.search"), label = "Team Search")
+  )
 }
 
-teams_variable_select <- function(namespace) {
-  # Namespace is absolutely required, DO NOT REMOVE!!
+team_data_Input <- function(namespace) {
   ns <- NS(namespace)
   
-  # Your component UI code here, currently using the file import module code
-  # from the tutorial
   tagList(
-    column(2, h2("Variables"), tags$ul(
-      actionButton(ns("Variable1"), "Variable 1"),
-      actionButton(ns("Variable2"), "Variable 2")
-    )),
-    column(3, h2("Control Panel"), uiOutput(ns("controlUI"))),
-    column(7, h2("Graphical Plot"))
+    uiOutput(ns("team.data")),
+    uiOutput(ns("team.players"))
+  )
+}
+
+team_match_data_Input <- function(namespace) {
+  ns <- NS(namespace)
+  
+  tagList(
+    uiOutput(ns("team.matches.control")),
+    dataTableOutput(ns("team.matches.df"))
   )
 }
 
 ###############################################################################
 # Panel's Server Modules
 ###############################################################################
-teams_variable <- function(input, output, session) {
-  v <- reactiveValues(
-    action.ui = NULL
-  )
+teams_search <- function(input, output, session, team.profile) {
+  ns <- session$ns
   
-  observeEvent(input$Variable1, {
-    v$action.ui <- sliderInput("new_slider", label = "Variable 1 Slider", 1, 10, 5)
+  teams_df <- reactive({
+    teams <- get_teams()
+    return(teams)
   })
   
-  observeEvent(input$Variable2, {
-    v$action.ui <- selectInput("new_select", label = "Variable 2 Select",
-                               choices = c("Choice 1" = "choice1",
-                                           "Choice 2" = "choice2"))
+  output$teams.list <- renderUI({
+    df <- teams_df()
+    select.list <- setNames(df$team_id, as.character(df$name))
+
+    selectInput(ns("teams.list"), label = "Team ID", select.list)
   })
   
-  output$controlUI <- renderUI({
-    if (is.null(v$action.ui)) {
-      return()
+  observeEvent(input$team.search, {
+    print("team.search pressed")
+    
+    team.profile$team.data <- list()
+    team.profile$team.data <- get_teams(input$teams.list)
+    
+    team.profile$team.players <- list()
+    team.profile$team.players$players <- get_team_players(input$teams.list)
+    
+    team.profile$team.matches <- list()
+    
+  })
+  
+}
+
+team_data <- function (input, output, session, team.profile) {
+  ns <- session$ns
+  
+  output$team.data <- renderUI({
+    if (length(team.profile$team.data) > 0) {
+      winrate = scales::percent(team.profile$team.data$wins / (team.profile$team.data$wins + team.profile$team.data$losses))
+      
+      div(
+        h2(team.profile$team.data$name),
+        img(src = team.profile$team.data$logo_url, style = "background-color:lightgrey;"),
+        h3(paste("Rating:", round(team.profile$team.data$rating))),
+        h3(paste("Wins:", team.profile$team.data$wins, "Loss:", team.profile$team.data$losses, "Win Rate:", winrate)),
+        hr()
+      )
     }
-    v$action.ui
+  })
+  
+  output$team.players <- renderUI({
+    if (length(team.profile$team.players) > 0) {
+      div(
+        dataTableOutput(ns("team.players.df")),
+        hr()
+      )
+      
+    }
+  })
+  
+  output$team.players.df <- renderDataTable({
+    if (length(team.profile$team.players) > 0) {
+      team.players.df <- team.profile$team.players$players %>%
+        filter(is_current_team_member == T) %>%
+        select(name, games_played, wins)
+      print(team.players.df)
+      
+      team.players.df
+    }
+  })
+}
+
+team_match_data <- function (input, output, session, team.profile) {
+  ns <- session$ns
+  
+  team_match_df <- reactive({
+    team.profile$team.matches$matches.df %>%
+      mutate(faction = ifelse(radiant, "Radiant", "Dire"),
+             win = (radiant_win && radiant) || !(radiant_win && radiant),
+             date = floor_date(ymd_hms(as.POSIXct(start_time, origin = "1970-01-01")), unit = "minute")) %>%
+      select(league_name, match_id, date, faction, win, opposing_team_name) %>%
+      arrange(desc(date)) %>%
+      top_n(as.integer(input$team.matches.get.count), date)
+  })
+  
+  observeEvent(input$team.matches.get, {
+    print(paste("team.matches.get", "pressed"))
+    
+    team.profile$team.matches <- list()
+    
+    if (length(team.profile$team.data) > 0) {
+      team.profile$team.matches$matches.df <- get_team_matches(team.profile$team.data$team_id)
+      print(team.profile$team.matches$matches.df)
+    }
+  })
+  
+  output$team.matches.control <- renderUI({
+    if (length(team.profile$team.data) > 0) {
+      div(
+        div(style = "display:inline-block;", textInput(ns("team.matches.get.count"), label = "Get Recent Matches:", value = 10)),
+        div(style = "display:inline-block;", actionButton(ns("team.matches.get"), label = "Get Matches"))
+      )
+    }
+    
+  })
+  
+  output$team.matches.df <- renderDataTable({
+    if (length(team.profile$team.matches) > 0) {
+      team_match_df()
+    }
   })
 }
 
@@ -68,8 +157,12 @@ teams_variable <- function(input, output, session) {
 # define the tab panel components
 teams.panel <- tabPanel(
   title = "Teams",
-  fluidRow(teams_search_input(PANEL.NAMESPACE)),
-  fluidRow(teams_variable_select(PANEL.NAMESPACE))
+  fluidRow(
+    column(3, teams_search_Input(PANEL.NAMESPACE)),
+    column(9, 
+           team_data_Input(PANEL.NAMESPACE),
+           team_match_data_Input(PANEL.NAMESPACE))
+  )
 )
 
 # call this function to add the tab panel
@@ -80,9 +173,17 @@ ADD_PANEL(teams.panel)
 # Add Panel into the list of panels to be displayed
 ###############################################################################
 team.panel.server <- substitute({
-  # TODO: Add the panel's server code here
-  callModule(teams_variable, PANEL.NAMESPACE)
+  team.profile <- reactiveValues(
+    team.data = list(),
+    team.players = list(),
+    team.matches = list()
+  )
   
+  
+  # TODO: Add the panel's server code here
+  callModule(teams_search, PANEL.NAMESPACE, team.profile)
+  callModule(team_data, PANEL.NAMESPACE, team.profile)
+  callModule(team_match_data, PANEL.NAMESPACE, team.profile)
   
   
 })
