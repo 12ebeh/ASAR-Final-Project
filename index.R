@@ -3,6 +3,7 @@
 ###############################################################################
 library(ggplot2)
 library(shiny)
+library(shinyTime)
 
 ###############################################################################
 # External Sources
@@ -33,15 +34,15 @@ ADD_SERVER_LOGIC <- function(new.logic) {
 }
 
 #source("template_panel.R", local = T)
-#source("teams_panel.R", local = T)
-source("player_panel.R", local = T)
+source("teams_panel.R", local = T)
+#source("player_panel.R", local = T)
 
 
 ###############################################################################
 # Page UI
 ###############################################################################
 ui <- shiny::fluidPage(
-  fluidRow(h1("Page Title")),
+  fluidRow(h1("Dota 2 Analyics Tool")),
   do.call(tabsetPanel, PANELS)
 )
 

@@ -80,6 +80,58 @@ ANCIENT.CREEPS <- c("npc_dota_neutral_black_drake",
 # internal process functions
 #   Contains function that are used by other functions in data_process.R
 ###############################################################################
+process_match_data <- function(match) {
+  match.list.names <- names(match)
+  match.data <- list()
+  
+  match.data$match.id <- as.character(match$match_id)
+  match.data$start.time <- ymd_hms(as.POSIXct(match$start_time, origin = "1970-01-01"))
+  match.data$duration <- match$duration
+  match.data$region <- ifelse(!is.null(match$region), match$region, NA)
+  match.data$patch <- ifelse(!is.null(match$patch), match$patch, NA)
+  match.data$league.id <- ifelse(!is.null(match$leagueid), match$leagueid, match$league$leagueid)
+  match.data$league.name <- ifelse(!is.null(match$league_name), match$league_name, match$league$name)
+  match.data$series.id <- ifelse(!is.null(match$series_id), match$series_id, NA)
+  match.data$series.type <- ifelse(!is.null(match$series_type), match$series_type, NA)
+  match.data$positive.votes <- match$positive_votes
+  match.data$negetive.votes <- match$negative_votes
+  match.data$radiant.win <- match$radiant_win
+  match.data$radiant.team.id <- ifelse(!is.null(match$radiant_team_id), match$radiant_team_id, match$radiant_team$team_id)
+  match.data$radiant.team.name <- ifelse(!is.null(match$radiant_team_name), match$radiant_team_name, match$radiant_team$name)
+  match.data$dire.team.id <- ifelse(!is.null(match$dire_team_id), match$dire_team_id, match$dire_team$team_id)
+  match.data$dire.team.name <- ifelse(!is.null(match$dire_team_name), match$dire_team_name, match$dire_team$name)
+  match.data$first.blood.time <- match$first_blood_time
+  match.data$barracks.status.radiant <- match$barracks_status_radiant
+  match.data$barracks.status.dire <- match$barracks_status_dire
+  match.data$tower.status.radiant <- match$tower_status_radiant
+  match.data$tower.status.dire <- match$tower_status_dire
+  match.data$throw <- ifelse("throw" %in% match.list.names, match$throw, NA)
+  match.data$comeback <- ifelse("comeback" %in% match.list.names, match$comeback, NA)
+  match.data$win <- ifelse("win" %in% match.list.names, match$win, NA)
+  match.data$loss <- ifelse("loss" %in% match.list.names, match$loss, NA)
+  match.data$gold.xp.adv <- data.frame(min = 1:length(match$radiant_gold_adv),
+                                       radiant.gold.adv = unlist(match$radiant_gold_adv),
+                                       radiant.xp.adv = unlist(match$radiant_xp_adv))
+  match.data$draft.picks <- 
+    if (class(match$draft_timings) == "data.frame") {
+      match$draft_timings
+    } else {
+      data.table::rbindlist(
+        lapply(match$draft_timings,
+               function (x) lapply(x, function (y) ifelse(is.null(y), NA, y))
+        )
+      )
+    }
+  match.data$objectives <-
+    if(class(match$objectives) == "data.frame") {
+      match$objectives
+    } else {
+      data.table::rbindlist(match$objectives, fill = T)
+    }
+  
+  return(match.data)
+}
+
 process_kills <- function(killed, creeps = c()) {
   kills <- 0
   for (creep in creeps) {
@@ -326,60 +378,40 @@ get_match_data <- function(match.id) {
     }
   }
   
-  match.list.names <- names(match)
-  match.data <- list()
+  match.data <- process_match_data(match)
+  return(match.data)
+}
+
+get_match_data_by_ids <- function (match.id.list) {
+  if (length(match.id.list) == 0) {
+    return(NULL)
+  }
   
-  match.data$match.id <- as.character(match.id)
-  match.data$start.time <- ymd_hms(as.POSIXct(match$start_time, origin = "1970-01-01"))
-  match.data$duration <- match$duration
-  match.data$region <- match$region
-  match.data$patch <- match$patch
-  match.data$league.id <- match$league$leagueid
-  match.data$league.name <- match$league$name
-  match.data$series.id <- match$series_id
-  match.data$series.type <- match$series_type
-  match.data$positive.votes <- match$positive_votes
-  match.data$negetive.votes <- match$negative_votes
-  match.data$radiant.win <- match$radiant_win
-  match.data$radiant.team.id <- match$radiant_team$team_id
-  match.data$radiant.team.name <- match$radiant_team$name
-  match.data$dire.team.id <- match$dire_team$team_id
-  match.data$dire.team.name <- match$dire_team$name
-  match.data$first.blood.time <- match$first_blood_time
-  match.data$barracks.status.radiant <- match$barracks_status_radiant
-  match.data$barracks.status.dire <- match$barracks_status_dire
-  match.data$tower.status.radiant <- match$tower_status_radiant
-  match.data$tower.status.dire <- match$tower_status_dire
-  match.data$throw <- ifelse("throw" %in% match.list.names, match$throw, NA)
-  match.data$comeback <- ifelse("comeback" %in% match.list.names, match$comeback, NA)
-  match.data$win <- ifelse("win" %in% match.list.names, match$win, NA)
-  match.data$loss <- ifelse("loss" %in% match.list.names, match$loss, NA)
-  match.data$gold.xp.adv <- data.frame(min = 1:length(match$radiant_gold_adv),
-                                       radiant.gold.adv = unlist(match$radiant_gold_adv),
-                                       radiant.xp.adv = unlist(match$radiant_xp_adv))
-  match.data$draft.picks <- 
-    if (class(match$draft_timings) == "data.frame") {
-      match$draft_timings
-    } else {
-      data.table::rbindlist(
-        lapply(match$draft_timings,
-               function (x) lapply(x, function (y) ifelse(is.null(y), NA, y))
-        )
-      )
-    }
-  match.data$objectives <-
-    if(class(match$objectives) == "data.frame") {
-      match$objectives
-    } else {
-      data.table::rbindlist(match$objectives, fill = T)
-    }
+  #sql <- "SELECT player_matches.*, matches.start_time, matches.duration, matches.radiant_win FROM player_matches LEFT JOIN matches ON player_matches.match_id = matches.match_id"
+  
+  sql <- "SELECT matches.*, leagues.leagueid, leagues.name as league_name FROM matches"
+  #sql <- paste(sql, "LEFT JOIN match_gcdata ON matches.match_id = match_gcdata.match_id")
+  sql <- paste(sql, "LEFT JOIN leagues ON matches.leagueid = leagues.leagueid")
+  sql <- paste(sql, "WHERE matches.match_id IN (", paste(match.id.list, collapse = ","), ")")
+  
+  out <- get_by_sql(sql)
+  #print(head(out$rows[1,]))
+  
+  match.data <- list()
+  for(i in 1:nrow(out$rows)) {
+    match.data[[i]] <- process_match_data(out$rows[i,])
+  }
   
   return(match.data)
 }
 
+get_match_data_by_conditions <- function (start.date = NULL, end.date = NULL, team.id = NULL, match.id.list = list()) {
+  
+}
+
 get_match_players <- function (match.id) {
   if (use.dpc) {
-    match.id = "3497210298"
+    #match.id = "3497210298"
     match <- json[[as.character(match.id)]]
   } else {
     match <- ROpenDota::get_match_details(match.id)
