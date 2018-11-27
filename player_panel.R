@@ -19,30 +19,12 @@ player_metrics_Input <- function(namespace) {
   )
 }
 
-player_match_metics_table_Input <- function(namespace) {
-  # Namespace is absolutely required, DO NOT REMOVE!!
-  ns <- NS(namespace)
-  
-  # Your component UI code here, currently using the file import module code
-  # from the tutorial
-  uiOutput(ns("player.basic.match.metrics"))
-}
-
-#player_match_metrics_plot_Input <- function(namespace) {
-#  # Namespace is absolutely required, DO NOT REMOVE!!
-#  ns <- NS(namespace)
-  
-#  tagList(
-#    uiOutput(ns("player.match.metrics.control")),
-#    plotOutput(ns("player.basic.match.metrics.plot"))
-#  )
-#}
-
 player_match_metrics_by_hero_Input <- function(namespace) {
   # Namespace is absolutely required, DO NOT REMOVE!!
   ns <- NS(namespace)
   
   tagList(
+    plotOutput(ns("player.win.rate.by.hero")),
     uiOutput(ns("player.basic.match.metrics.by.hero.control")),
     plotOutput(ns("player.basic.match.metrics.by.hero.plot")),
     hr()
@@ -58,6 +40,16 @@ player_match_metrics_by_hero_time_series_Input <- function(namespace) {
     hr()
   )
 }
+
+player_match_metics_table_Input <- function(namespace) {
+  # Namespace is absolutely required, DO NOT REMOVE!!
+  ns <- NS(namespace)
+  
+  # Your component UI code here, currently using the file import module code
+  # from the tutorial
+  uiOutput(ns("player.basic.match.metrics"))
+}
+
 
 ###############################################################################
 # Panel's Server Modules
@@ -86,32 +78,6 @@ player_metrics <- function(input, output, session, player.profile) {
   })
 }
 
-player_match_metics_table <- function(input, output, session, player.profile) {
-  show_match_metrics_table <- eventReactive(input$show.match.metrics.table, {
-    player.profile$show.match.data = !player.profile$show.match.data
-  })
-  
-  output$player.basic.match.metrics <-
-    renderUI({
-      if (length(player.profile$match.data) > 0) {
-        button.text <- "Show Match Data"
-        ns <- session$ns
-        tagList(
-          actionButton(ns("show.match.metrics.table"), button.text),
-          br(),
-          dataTableOutput(ns("player.basic.match.metrics.table")),
-          hr()
-        )
-      }
-    })
-  
-  output$player.basic.match.metrics.table <- renderDataTable({
-    if (show_match_metrics_table()) {
-      player.profile$match.data$basic.metrics
-    }
-  }, options = list(scrollX=T, pageLength=20))
-}
-
 player_basic_match_metrics_by_hero <- function(input, output, session, player.profile) {
   ns <- session$ns
   
@@ -120,23 +86,40 @@ player_basic_match_metrics_by_hero <- function(input, output, session, player.pr
     if (length(player.profile$match.data) > 0 ) {
       df <- player.profile$match.data$basic.metrics %>%
         group_by(hero.id) %>%
-        summarise(win.rate = sum(is.win) / n(),
-                  average.level = mean(level),
-                  average.kills = mean(kills),
-                  average.deaths = mean(deaths),
-                  average.assists = mean(assists))
+        summarise(win.rate = sum(is.win) / n())
+                  #mean.level = mean(level),
+                  #mean.kills = mean(kills),
+                  #mean.deaths = mean(deaths),
+                  #mean.assists = mean(assists),
+                  #mean.kda = mean(kda),
+                  #mean.gold.per.min = mean(gold.per.min),
+                  #mean.xp.per.min = mean(xp.per.min),
+                  #mean.actions.per.min = mean(actions.per.min),
+                  #)
       
       #df.names <- colnames(df)
       #print(df)
       
-      df %>% gather(metric, value, "win.rate", average.level, average.kills, average.deaths, average.assists)
+      #df %>% gather(metric, value, win.rate, average.level, average.kills, average.deaths, average.assists)
+    }
+  })
+  
+  output$player.win.rate.by.hero <- renderPlot({
+    if (length(player.profile$match.data) > 0) {
+      df_by_hero() %>%
+        ggplot() +
+        geom_col(aes(x = as.factor(hero.id), y = win.rate))
     }
   })
   
   output$player.basic.match.metrics.by.hero.control <- renderUI({
     if (length(player.profile$match.data) > 0) {
-      df <- df_by_hero()
-      metric.names <- unique(df$metric)
+      #df <- df_by_hero()
+      metric.names <- 
+        player.profile$match.data$basic.metrics %>% 
+        select(level, kills, deaths, assists, kda, total.gold, gold, gold.spent, gold.per.min, total.xp, xp.per.min, actions.per.min, last.hits,
+               denies, stuns) %>%
+        colnames()
       print(metric.names)
 
       div(
@@ -150,11 +133,14 @@ player_basic_match_metrics_by_hero <- function(input, output, session, player.pr
   output$player.basic.match.metrics.by.hero.plot <- renderPlot({
     if (length(player.profile$match.data) > 0 && !is.null(input$metric.select)) {
       #print(head(player.profile$match.data$basic.metrics))
-      df_by_hero() %>% 
-        filter(metric == input$metric.select) %>%
+      player.profile$match.data$basic.metrics %>%
+        select(hero.id, input$metric.select) %>%
+        #filter(metric == input$metric.select) %>%
         ggplot() +
-        geom_col(aes(x = as.factor(hero.id), y = value))
-    }
+        geom_boxplot(aes_string(x = "as.factor(hero.id)", y = input$metric.select)) +
+        xlab("Heroes Played") + ylab(input$metric.select) + 
+        expand_limits(y = 0)
+      }
   })
 }
 
@@ -168,8 +154,10 @@ player_match_metrics_by_hero_time_series <- function (input, output, session, pl
         group_by(hero.id) %>%
         arrange(hero.id, start.time) %>%
         mutate(time.id = 1:n()) %>%
-        select(hero.id, start.time, kills, deaths, assists, time.id) %>%
-        gather(metric, value, kills, deaths, assists)
+        select(hero.id, start.time, level, kills, deaths, assists, kda, total.gold, gold, gold.spent,
+               gold.per.min, total.xp, xp.per.min, actions.per.min, last.hits, denies, stuns, time.id) %>%
+        gather(metric, value, level, kills, deaths, assists, kda, total.gold, gold, gold.spent,
+               gold.per.min, total.xp, xp.per.min, actions.per.min, last.hits, denies, stuns)
     }
   })
   
@@ -202,10 +190,38 @@ player_match_metrics_by_hero_time_series <- function (input, output, session, pl
         p <- p + geom_line(aes(x = as.factor(start.time), y = value, group = 1))
       }
       
-      p
+      p + expand_limits(y = 0)
     }
   })
 }
+
+
+player_match_metics_table <- function(input, output, session, player.profile) {
+  show_match_metrics_table <- eventReactive(input$show.match.metrics.table, {
+    player.profile$show.match.data = !player.profile$show.match.data
+  })
+  
+  output$player.basic.match.metrics <-
+    renderUI({
+      if (length(player.profile$match.data) > 0) {
+        button.text <- "Show Match Data"
+        ns <- session$ns
+        tagList(
+          actionButton(ns("show.match.metrics.table"), button.text),
+          br(),
+          dataTableOutput(ns("player.basic.match.metrics.table")),
+          hr()
+        )
+      }
+    })
+  
+  output$player.basic.match.metrics.table <- renderDataTable({
+    if (show_match_metrics_table()) {
+      player.profile$match.data$basic.metrics
+    }
+  }, options = list(scrollX=T, pageLength=20))
+}
+
 
 ###############################################################################
 # Add Panel into the list of panels to be displayed

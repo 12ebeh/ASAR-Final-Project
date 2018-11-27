@@ -136,7 +136,7 @@ team_match_data <- function (input, output, session, team.profile) {
   output$team.matches.control <- renderUI({
     if (length(team.profile$team.data) > 0) {
       div(
-        div(style = "display:inline-block;", textInput(ns("team.matches.get.count"), label = "Number of Matches to Retrieve:", value = 10)),
+        div(style = "display:inline-block;", textInput(ns("team.matches.get.count"), label = "Get Recent Matches:", value = 10)),
         div(style = "display:inline-block;", actionButton(ns("team.matches.get"), label = "Get Matches"))
       )
     }

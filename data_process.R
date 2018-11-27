@@ -116,11 +116,12 @@ process_match_data <- function(match) {
     if (class(match$draft_timings) == "data.frame") {
       match$draft_timings
     } else {
-      data.table::rbindlist(
-        lapply(match$draft_timings,
-               function (x) lapply(x, function (y) ifelse(is.null(y), NA, y))
-        )
-      )
+      as.data.frame(match$draft_timings)
+      #data.table::rbindlist(
+        #lapply(match$draft_timings,
+               #function (x) lapply(x, function (y) ifelse(is.null(y), NA, y))
+        #)
+      #)
     }
   match.data$objectives <-
     if(class(match$objectives) == "data.frame") {
@@ -183,8 +184,8 @@ process_match_player_data <- function(player, match.starttime, match.duration, m
   player.data$gold.per.min <- player$gold_per_min #y
   player.data$total.xp <- ifelse(!is.null(player$total_xp), player$total_xp,
                                  as.integer(player$xp_per_min * match.duration / 60))
-  player.data$xp_per_min <- player$xp_per_min #y
-  player.data$actions_per_min <- ifelse(!is.null(player$actions_per_min), player$actions_per_min,
+  player.data$xp.per.min <- player$xp_per_min #y
+  player.data$actions.per.min <- ifelse(!is.null(player$actions_per_min), player$actions_per_min,
                                         as.integer(rowSums(player$actions, na.rm = T) * 60 / match.duration))
   player.data$last.hits <- player$last_hits #y
   player.data$denies <- player$denies #y
@@ -283,6 +284,13 @@ get_by_sql <- function (sql) {
   sql <- URLencode(sql)
   url <- paste(prefix, "?sql=", sql, sep = "")
   out <- get_url_internal(url)
+  
+  return(out)
+}
+
+get_all_heroes_info <- function () {
+  prefix <- "https://api.opendota.com/api/heroes"
+  out <- get_url_internal(prefix)
   
   return(out)
 }
@@ -405,8 +413,41 @@ get_match_data_by_ids <- function (match.id.list) {
   return(match.data)
 }
 
-get_match_data_by_conditions <- function (start.date = NULL, end.date = NULL, team.id = NULL, match.id.list = list()) {
+get_match_data_by_conditions <- function (limit = 30, start.date = NULL, end.date = NULL, team.id = NULL, match.id.list = list()) {
+  sql <- "SELECT matches.match_id FROM matches"
   
+  conditional <- "WHERE"
+  
+  if (!is.null(start.date)) {
+    start.date <- as.integer(start.date)
+    sql <- paste(sql, conditional, "start_time >=", start.date)
+    conditional <- "AND"
+  }
+  
+  if (!is.null(end.date)) {
+    end.date <- as.integer(end.date)
+    sql <- paste(sql, conditional, "start_time <=", end.date)
+    conditional <- "AND"
+  }
+  
+  if (!is.null(team.id)) {
+    end.date <- as.numeric(team.id)
+    sql <- paste(sql, conditional, "team_id ==", team.id)
+    conditional <- "AND"
+  }
+  
+  sql <- paste(sql, "LIMIT", limit)
+  
+  out <- get_by_sql(sql)
+  if (out$rowCount <= 0) {
+    return (NULL)
+  }
+  
+  search.ids <- unlist(out$rows)
+  search.ids <- unique(append(search.ids, match.id.list))
+  names(search.ids) <- NULL
+  
+  return(get_match_data_by_ids(search.ids))
 }
 
 get_match_players <- function (match.id) {
