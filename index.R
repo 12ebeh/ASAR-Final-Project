@@ -36,6 +36,7 @@ ADD_SERVER_LOGIC <- function(new.logic) {
 #source("template_panel.R", local = T)
 source("teams_panel.R", local = T)
 source("player_panel.R", local = T)
+source("matches_panel.R", local = T)
 
 
 ###############################################################################

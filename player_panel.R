@@ -276,7 +276,7 @@ player.panel.server <- substitute({
     account.id <- input$account.id
     pro.player <- get_pro_players(account.id)
     player <- get_player(account.id)
-    player.matches <- get_player_match_details(account.id, limit = as.integer(input$last.match.count))
+    player.matches <- get_player_match_details(account.id, limit = 30)#as.integer(input$last.match.count))
     
     player.profile$pro.data <- list()
     if (!is.null(pro.player)) {
@@ -298,8 +298,8 @@ player.panel.server <- substitute({
     if (!is.null(player.matches)) {
       player.matches.names <- names(player.matches[[1]])
       print(player.matches.names)
-      player.matches.df <- data.table::rbindlist(lapply(player.matches, function (x) {
-        x[player.matches.names[2:44]]
+      player.matches.df <- data.table::rbindlist(fill = T, lapply(player.matches, function (x) {
+        x[player.matches.names[3:45]]
       }))
       player.profile$match.data$basic.metrics <- player.matches.df
     }

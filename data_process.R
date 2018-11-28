@@ -15,6 +15,15 @@ debug_load_test_dataset <- function() {
   return(json)
 }
 
+###############################################################################
+# variable defines
+###############################################################################
+MINUTE.IN.SEc <- 60
+HOUR.IN.SEC <- 60 * MINUTE.IN.SEc
+DAY.IN.SEC <- HOUR.IN.SEC * 24
+WEEK.IN.SEC <- DAY.IN.SEC * 7
+
+
 LANE.CREEPS <- c("npc_dota_creep_badguys_melee",
                  "npc_dota_creep_badguys_melee_diretide",
                  "npc_dota_creep_badguys_melee_upgraded",
@@ -109,13 +118,23 @@ process_match_data <- function(match) {
   match.data$comeback <- ifelse("comeback" %in% match.list.names, match$comeback, NA)
   match.data$win <- ifelse("win" %in% match.list.names, match$win, NA)
   match.data$loss <- ifelse("loss" %in% match.list.names, match$loss, NA)
-  match.data$gold.xp.adv <- data.frame(min = 1:length(match$radiant_gold_adv),
-                                       radiant.gold.adv = unlist(match$radiant_gold_adv),
+  match.data$gold.xp.adv <- data.frame(radiant.gold.adv = unlist(match$radiant_gold_adv),
                                        radiant.xp.adv = unlist(match$radiant_xp_adv))
+  if (nrow(match.data$gold.xp.adv) > 0) {
+    match.data$gold.xp.adv$min <- 1:nrow(match.data$gold.xp.adv)
+  } else {
+    match.data$gold.xp.adv$min <- NULL
+  }
   match.data$draft.picks <- 
-    if (class(match$draft_timings) == "data.frame") {
+    if (is.null(match$draft_timings) || is.na(match$draft_timings)) {
+      #print("case 1")
+      NA
+    } else if (class(match$draft_timings) == "data.frame") {
+      #print("case 2")
       match$draft_timings
     } else {
+      #print("case 3")
+      #print(match$draft_timings)
       as.data.frame(match$draft_timings)
       #data.table::rbindlist(
         #lapply(match$draft_timings,
@@ -124,7 +143,9 @@ process_match_data <- function(match) {
       #)
     }
   match.data$objectives <-
-    if(class(match$objectives) == "data.frame") {
+    if (is.null(match$objectives) || is.na(match$objectives)) {
+      NA
+    } else if(class(match$objectives) == "data.frame") {
       match$objectives
     } else {
       data.table::rbindlist(match$objectives, fill = T)
@@ -147,6 +168,7 @@ process_kills <- function(killed, creeps = c()) {
 process_match_player_data <- function(player, match.starttime, match.duration, match.radiant.win) {
   player.data <- list()
   
+  player.data$match.id <- player$match_id
   player.data$account.id <- player$account_id #y
   player.data$name <- player$name
   player.data$persona.name <- player$personaname
@@ -186,7 +208,8 @@ process_match_player_data <- function(player, match.starttime, match.duration, m
                                  as.integer(player$xp_per_min * match.duration / 60))
   player.data$xp.per.min <- player$xp_per_min #y
   player.data$actions.per.min <- ifelse(!is.null(player$actions_per_min), player$actions_per_min,
-                                        as.integer(rowSums(player$actions, na.rm = T) * 60 / match.duration))
+                                        ifelse (!is.null(player$actions) && !is.na(player$actions),
+                                                as.integer(rowSums(player$actions, na.rm = T) * 60 / match.duration), NA))
   player.data$last.hits <- player$last_hits #y
   player.data$denies <- player$denies #y
   player.data$lane.kills <- ifelse(!is.null(player$lane_kills), player$lane_kills,
@@ -209,9 +232,24 @@ process_match_player_data <- function(player, match.starttime, match.duration, m
                                        ifelse(is.null(player$killed$npc_dota_observer_wards) || is.na(player$killed$npc_dota_observer_wards),
                                               0, player$killed$npc_dota_observer_wards))
   player.data$roshan.kills <- ifelse(!is.null(player$roshan_kills), player$roshan_kills, player$roshans_killed)
-  player.data$stuns <- player$stuns #y
-  player.data$purchase.log <- data.table::rbindlist(player$purchase_log, fill = T) #y
-  player.data$runes.log <- data.table::rbindlist(player$runes_log, fill = T) #y
+  player.data$stuns <- ifelse(!is.null(player$stuns), player$stuns, NA) #y
+  player.data$purchase.log <- 
+    if (is.null(player$purchase_log) || is.na(player$purchase_log)) {
+      NA
+  } else if (class(player$purchase_log) == "data.frame") {
+    player$purchase_log
+  } else {
+    data.table::rbindlist(player$purchase_log, fill = T) #y
+  }
+  player.data$runes.log <- 
+    if (is.null(player$runes_log) || is.na(player$runes_log)) {
+      NA
+    } else if (class(player$runes_log) == "data.frame") {
+      player$runes_log
+    } else {
+      data.table::rbindlist(player$runes_log, fill = T) #y
+    }
+  
   gold.t.len <- length(unlist(player$gold_t))
   xp.t.len <- length(unlist(player$xp_t))
   lh.t.len <- length(unlist(player$lh_t))
@@ -281,11 +319,10 @@ get_schema <- function (table = NULL) {
 
 get_by_sql <- function (sql) {
   prefix <- "https://api.opendota.com/api/explorer"
+  print(paste("get_by_sql:", sql))
   sql <- URLencode(sql)
   url <- paste(prefix, "?sql=", sql, sep = "")
   out <- get_url_internal(url)
-  
-  return(out)
 }
 
 get_all_heroes_info <- function () {
@@ -414,40 +451,57 @@ get_match_data_by_ids <- function (match.id.list) {
 }
 
 get_match_data_by_conditions <- function (limit = 30, start.date = NULL, end.date = NULL, team.id = NULL, match.id.list = list()) {
-  sql <- "SELECT matches.match_id FROM matches"
+  sql <- "SELECT matches.*, leagues.leagueid, leagues.name as league_name FROM matches"
+  #sql <- paste(sql, "LEFT JOIN match_gcdata ON matches.match_id = match_gcdata.match_id")
+  sql <- paste(sql, "LEFT JOIN leagues ON matches.leagueid = leagues.leagueid")
   
   conditional <- "WHERE"
   
-  if (!is.null(start.date)) {
+  if (!is.null(start.date) && !is.na(start.date)) {
     start.date <- as.integer(start.date)
     sql <- paste(sql, conditional, "start_time >=", start.date)
     conditional <- "AND"
   }
   
-  if (!is.null(end.date)) {
+  if (!is.null(end.date) && !is.na(end.date)) {
     end.date <- as.integer(end.date)
     sql <- paste(sql, conditional, "start_time <=", end.date)
     conditional <- "AND"
   }
   
-  if (!is.null(team.id)) {
+  if (!is.null(team.id) && !is.na(team.id)) {
     end.date <- as.numeric(team.id)
-    sql <- paste(sql, conditional, "team_id ==", team.id)
+    sql <- paste(sql, conditional, "(radiant_team_id =", team.id, "OR dire_team_id =", team.id, ")")
     conditional <- "AND"
   }
   
-  sql <- paste(sql, "LIMIT", limit)
+  if (!is.null(match.id.list) && !is.na(match.id.list) && length(match.id.list) > 0) {
+    sql <- paste(sql, conditional, "matches.match_id IN (", paste(match.id.list, collapse = ","), ")")
+    conditional <- "AND"
+  }
+  
+  if (!is.null(limit) && !is.na(limit)) {
+    sql <- paste(sql, "LIMIT", limit)
+  }
+  
   
   out <- get_by_sql(sql)
   if (out$rowCount <= 0) {
     return (NULL)
   }
   
-  search.ids <- unlist(out$rows)
-  search.ids <- unique(append(search.ids, match.id.list))
-  names(search.ids) <- NULL
+  match.data <- list()
+  for(i in 1:nrow(out$rows)) {
+    match.data[[i]] <- process_match_data(out$rows[i,])
+  }
   
-  return(get_match_data_by_ids(search.ids))
+  return(match.data)
+  
+  #search.ids <- unlist(out$rows)
+  #search.ids <- unique(append(search.ids, match.id.list))
+  #names(search.ids) <- NULL
+  
+  #return(get_match_data_by_ids(search.ids))
 }
 
 get_match_players <- function (match.id) {
@@ -483,7 +537,8 @@ get_match_players <- function (match.id) {
 }
 
 get_player_match_details <- function (account.id, limit = 100, earlier.than.date = NULL) {
-  sql <- "SELECT player_matches.*, matches.start_time, matches.duration, matches.radiant_win FROM player_matches LEFT JOIN matches ON player_matches.match_id = matches.match_id"
+  sql <- "SELECT player_matches.*, matches.start_time, matches.duration, matches.radiant_win FROM player_matches"
+  sql <- paste(sql, "LEFT JOIN matches ON player_matches.match_id = matches.match_id")
   sql <- paste(sql, "WHERE player_matches.account_id =", account.id)
   
   if (!is.null(earlier.than.date)) {
@@ -502,7 +557,7 @@ get_player_match_details <- function (account.id, limit = 100, earlier.than.date
     sql <- paste(sql, "LIMIT", limit)
   }
   
-  print(sql)
+  #print(sql)
   out <- get_by_sql(sql)
   
   player.match.details <- list()
@@ -511,6 +566,115 @@ get_player_match_details <- function (account.id, limit = 100, earlier.than.date
   }
   
   return(player.match.details)
+}
+
+get_player_match_details_by_conditions <- function (limit = 30, start.date = NULL, end.date = NULL, team.id = NULL, match.id.list = list()) {
+  sql <- "SELECT player_matches.*, matches.start_time, matches.duration, matches.radiant_win FROM player_matches"
+  sql <- paste(sql, "LEFT JOIN matches ON player_matches.match_id = matches.match_id")
+  
+  conditional <- "WHERE"
+  
+  if (!is.null(start.date) && !is.na(start.date)) {
+    start.date <- as.integer(start.date)
+    sql <- paste(sql, conditional, "matches.start_time >=", start.date)
+    conditional <- "AND"
+  }
+  
+  if (!is.null(end.date) && !is.na(end.date)) {
+    end.date <- as.integer(end.date)
+    sql <- paste(sql, conditional, "matches.start_time <=", end.date)
+    conditional <- "AND"
+  }
+  
+  if (!is.null(team.id) && !is.na(team.id)) {
+    end.date <- as.numeric(team.id)
+    sql <- paste(sql, conditional, "(matches.radiant_team_id =", team.id, "OR matches.dire_team_id =", team.id, ")")
+    conditional <- "AND"
+  }
+  
+  if (!is.null(match.id.list) && !is.na(match.id.list) && length(match.id.list) > 0) {
+    sql <- paste(sql, conditional, "matches.match_id IN (", paste(match.id.list, collapse = ","), ")")
+    conditional <- "AND"
+  }
+  
+  if (!is.null(limit) && !is.na(limit) && limit > 0) {
+    sql <- paste(sql, "LIMIT", limit)
+  }
+  
+  
+  out <- get_by_sql(sql)
+  if(out$rowCount <= 0) {
+    return(NULL)
+  }
+  
+  player.match.details <- list()
+  for(i in 1:nrow(out$rows)) {
+    player.match.details[[i]] <- process_match_player_data(out$rows[i,], out$rows$start_time, out$rows$duration, out$rows$radiant_win)
+  }
+  
+  return(player.match.details)
+}
+
+get_match_and_player_details_by_conditions <- function (limit = 30, start.date = NULL, end.date = NULL, team.id = NULL, match.id.list = list()) {
+  
+  
+  conditional.sql <- ""
+  conditional <- "WHERE"
+  
+  if (!is.null(start.date) && !is.na(start.date)) {
+    start.date <- as.integer(start.date)
+    conditional.sql <- paste(conditional.sql, conditional, "matches.start_time >=", start.date)
+    conditional <- "AND"
+  }
+  
+  if (!is.null(end.date) && !is.na(end.date)) {
+    end.date <- as.integer(end.date)
+    conditional.sql <- paste(conditional.sql, conditional, "matches.start_time <=", end.date)
+    conditional <- "AND"
+  }
+  
+  if (!is.null(team.id) && !is.na(team.id)) {
+    end.date <- as.numeric(team.id)
+    conditional.sql <- paste(conditional.sql, conditional, "(matches.radiant_team_id =", team.id, "OR matches.dire_team_id =", team.id, ")")
+    conditional <- "AND"
+  }
+  
+  if (!is.null(match.id.list) && !is.na(match.id.list) && length(match.id.list) > 0) {
+    conditional.sql <- paste(conditional.sql, conditional, "matches.match_id IN (", paste(match.id.list, collapse = ","), ")")
+    conditional <- "AND"
+  }
+  
+  if (!is.null(limit) && !is.na(limit) && limit > 0) {
+    conditional.sql <- paste(conditional.sql, "LIMIT", limit)
+  }
+  
+  #inner.sql <- paste("SELECT * from matches WHERE", conditional.sql)
+  
+  sql <- "SELECT player_matches.*, matches.*, leagues.leagueid, leagues.name as league_name FROM matches"
+  
+  #sql <- paste(sql, "LEFT JOIN player_matches ON player_matches.match_id = matches.match_id")
+  sql <- paste(sql, "LEFT JOIN player_matches ON player_matches.match_id = matches.match_id")
+  sql <- paste(sql, "LEFT JOIN leagues ON matches.leagueid = leagues.leagueid")
+  #sql <- paste(sql, "LEFT JOIN match_gcdata ON matches.match_id = match_gcdata.match_id")
+  sql <- paste(sql, conditional.sql)
+  
+  
+  out <- get_by_sql(sql)
+  if(out$rowCount <= 0) {
+    return(NULL)
+  }
+  
+  match.data <- list()
+  for(i in 1:nrow(out$rows)) {
+    match.data[[i]] <- process_match_data(out$rows[i,])
+  }
+  
+  player.match.details <- list()
+  for(i in 1:nrow(out$rows)) {
+    player.match.details[[i]] <- process_match_player_data(out$rows[i,], out$rows$start_time, out$rows$duration, out$rows$radiant_win)
+  }
+  
+  return(list(match.data, player.match.details))
 }
 
 if (use.dpc) {
