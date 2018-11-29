@@ -106,9 +106,12 @@ player_basic_match_metrics_by_hero <- function(input, output, session, player.pr
   
   output$player.win.rate.by.hero <- renderPlot({
     if (length(player.profile$match.data) > 0) {
-      df_by_hero() %>%
+      df <- df_by_hero()
+      df$hero.names <- HEROES.INFO$localized_name[df$hero.id - 1]
+      df %>%
         ggplot() +
-        geom_col(aes(x = as.factor(hero.id), y = win.rate))
+        geom_col(aes(x = as.factor(hero.names), y = win.rate)) +
+        scale_y_continuous(labels = scales::percent)
     }
   })
   
@@ -132,12 +135,13 @@ player_basic_match_metrics_by_hero <- function(input, output, session, player.pr
   
   output$player.basic.match.metrics.by.hero.plot <- renderPlot({
     if (length(player.profile$match.data) > 0 && !is.null(input$metric.select)) {
-      #print(head(player.profile$match.data$basic.metrics))
-      player.profile$match.data$basic.metrics %>%
-        select(hero.id, input$metric.select) %>%
+      df <- player.profile$match.data$basic.metrics
+      df$hero.names <- HEROES.INFO$localized_name[df$hero.id]
+      df %>%
+        select(hero.names, input$metric.select) %>%
         #filter(metric == input$metric.select) %>%
         ggplot() +
-        geom_boxplot(aes_string(x = "as.factor(hero.id)", y = input$metric.select)) +
+        geom_boxplot(aes_string(x = "as.factor(hero.names)", y = input$metric.select)) +
         xlab("Heroes Played") + ylab(input$metric.select) + 
         expand_limits(y = 0)
       }
@@ -165,6 +169,7 @@ player_match_metrics_by_hero_time_series <- function (input, output, session, pl
     if (length(player.profile$match.data) > 0) {
       df <- df.ts()
       hero.list <- unique(df$hero.id)
+      names(hero.list) <- HEROES.INFO$localized_name[hero.list-1]
       metrics.list <- unique(df.ts()$metric)
       div(
         div(style = "display:inline-block; vertical-align:top;", 
