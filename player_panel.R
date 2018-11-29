@@ -107,11 +107,12 @@ player_basic_match_metrics_by_hero <- function(input, output, session, player.pr
   output$player.win.rate.by.hero <- renderPlot({
     if (length(player.profile$match.data) > 0) {
       df <- df_by_hero()
-      df$hero.names <- HEROES.INFO$localized_name[df$hero.id - 1]
+      df$hero.names <- HEROES.INFO$localized_name[df$hero.id]
       df %>%
         ggplot() +
         geom_col(aes(x = as.factor(hero.names), y = win.rate)) +
-        scale_y_continuous(labels = scales::percent)
+        scale_y_continuous(labels = scales::percent) +
+        xlab("Heroes Played") + ylab("Win Rate")
     }
   })
   
@@ -169,7 +170,7 @@ player_match_metrics_by_hero_time_series <- function (input, output, session, pl
     if (length(player.profile$match.data) > 0) {
       df <- df.ts()
       hero.list <- unique(df$hero.id)
-      names(hero.list) <- HEROES.INFO$localized_name[hero.list-1]
+      names(hero.list) <- HEROES.INFO$localized_name[hero.list]
       metrics.list <- unique(df.ts()$metric)
       div(
         div(style = "display:inline-block; vertical-align:top;", 

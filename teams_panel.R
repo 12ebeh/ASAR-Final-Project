@@ -238,7 +238,7 @@ team_match_heros <- function (input, output, session, team.profile) {
       print("team.match.hero.appearance.plot")
       total.match.count <- length(unique(team.profile$team.pickbans$draft.picks$match.id))
       df <- pick_bans_df()
-      df$hero.names <- HEROES.INFO$localized_name[df$hero_id-1]
+      df$hero.names <- HEROES.INFO$localized_name[df$hero_id]
       #hero.type <- unlist(lapply(HEROES.INFO$roles[df$hero_id-1], function (x) x[1]), recursive = F)
       #print(hero.type)
       #df$hero.types <- hero.type
