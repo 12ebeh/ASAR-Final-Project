@@ -28,6 +28,14 @@ match_overall_Input <- function(namespace) {
   )
 }
 
+match_player_metrics_Input <- function(namespace) {
+  ns <- NS(namespace)
+  
+  tagList(
+    uiOutput(ns("match.player.metrics.control"))
+  )
+}
+
 ###############################################################################
 # Panel's Server Modules
 ###############################################################################
@@ -35,18 +43,19 @@ match_search <- function(input, output, session, match.data) {
   ns <- session$ns
   
   observeEvent(input$match.search.ui.action, {
+    max.match.count <- 100
     match.count <- as.integer(input$match.search.ui.match.count)
     if (is.na(match.count)) {
-      match.count = 100
+      match.count = max.match.count
     } else {
-      match.count = min(100, match.count)
+      match.count = min(max.match.count, match.count)
     }
     
     start.date <- ymd_hms(input$match.search.ui.start.date)
     end.date <- ymd_hms(input$match.search.ui.end.date)
     team.id <- as.integer(input$match.search.ui.team.id)
     match.ids <- as.character(input$match.search.ui.match.id)
-    print(match.ids)
+    #print(match.ids)
     if (match.ids != "") {
       match.ids <- unlist(strsplit(match.ids, ","))
       match.ids <- lapply(match.ids, function(x) {
@@ -60,7 +69,6 @@ match_search <- function(input, output, session, match.data) {
     print("debug")
     match.data$search.match.data <- list()
     df.all <- get_match_and_player_details_by_conditions(limit = match.count, start.date = start.date, end.date = end.date, team.id = team.id, match.id.list = match.ids)
-    
     
     print("debug3")
     if (is.null(df.all)) {
@@ -136,14 +144,14 @@ match_search <- function(input, output, session, match.data) {
     
     match.data$processed.match.player.data <- list()
     
-    #match.data$processed.match.player.data$basic.player.metric <-
-    player.test <-
+    match.data$processed.match.player.data$basic.player.metric <-
+    #player.test <-
       data.table::rbindlist(fill = T, lapply(found.matches.player.data, function (x) {
       x[found.matches.player.data.names[1:45]]
     }))
     
-    #match.data$processed.match.player.data$player.purchase.log <-
-    player.test2 <- 
+    match.data$processed.match.player.data$player.purchase.log <-
+    #player.test2 <- 
       data.table::rbindlist(fill = T, lapply(found.matches.player.data, function (x) {
         if (nrow(x$purchase.log) == 0) {
           purchase.log <- data.frame(match.id = NA)
@@ -170,8 +178,8 @@ match_search <- function(input, output, session, match.data) {
         return(runes.log)
       }))
     
-    #match.data$processed.match.player.data$player.purchase.log <-
-    player.test4 <-
+    match.data$processed.match.player.data$player.purchase.log <-
+    #player.test4 <-
       data.table::rbindlist(fill = T, lapply(found.matches.player.data, function (x) {
         if (nrow(x$metrics_t) == 0) {
           metrics_t <- data.frame(match.id = NA)
@@ -184,8 +192,8 @@ match_search <- function(input, output, session, match.data) {
         return(metrics_t)
       }))
     
-    #match.data$processed.match.player.data$player.abiliies.upgrade <-
-    player.test5 <-
+    match.data$processed.match.player.data$player.abiliies.upgrade <-
+    #player.test5 <-
       data.table::rbindlist(fill = T, lapply(found.matches.player.data, function (x) {
         if (nrow(x$abilities.upgrade) == 0) {
           abilities.upgrade <- data.frame(match.id = NA)
@@ -206,7 +214,7 @@ match_search <- function(input, output, session, match.data) {
     start.date <- end.date - DAY.IN.SEC * 90
     
     div(
-      textInput(ns("match.search.ui.match.count"), label = "Number of Matches"),
+      textInput(ns("match.search.ui.match.count"), label = "Number of Matches", value = 30),
       textInput(ns("match.search.ui.start.date"), label = "From (yyyy-mm-dd)", value = ymd_hms(start.date)),
       textInput(ns("match.search.ui.end.date"), label = "To (yyyy-mm-dd)", value = ymd_hms(end.date)),
       textInput(ns("match.search.ui.team.id"), label = "Team ID"),
@@ -233,13 +241,17 @@ match_overall <- function(input, output, session, match.data) {
   output$match.overall.ui <- renderUI({
     if (length(match.data$processed.match.data) > 0) {
       div(h2("Match Statistics"),
+          h3("Overall Win Rate by Faction"),
           plotOutput(ns("match.overall.faction.win.rate.plot")),
+          h3("Match Duration"),
+          sliderInput(ns("match.overall.duration.ui"), "Number of Bins", 5, 50, 1),
           plotOutput(ns("match.overall.duration.plot"))
       )
     }
   })
   
   output$match.overall.faction.win.rate.plot <- renderPlot({
+    #print(match.data$processed.match.data)
     if (length(match.data$processed.match.data) > 0) {
       df <- match_overall_win_rate()
       total.wins <- sum(df$wins)
@@ -255,9 +267,73 @@ match_overall <- function(input, output, session, match.data) {
         select(duration) %>%
         transmute(duration = round(duration / MINUTE.IN.SEc, 2) ) %>%
         ggplot() +
-        geom_histogram(aes(x = duration))
+        geom_histogram(aes(x = duration), bins = input$match.overall.duration.ui)
     }
   })
+}
+
+match_player_metrics <- function(input, output, session, match.data) {
+  ns <- session$ns
+  
+  player_metric_df <- reactive({
+    as.data.frame(match.data$processed.match.player.data$basic.player.metric[,c(9,22:45)])
+  })
+  
+  compare_pressed <- eventReactive(input$match.player.metric.compare, {
+    if (length(match.data$processed.match.player.data) > 0) {
+      df <- player_metric_df()
+      df <- df[,input$match.player.metric.select]
+      #df <- df[!is.na(df),]
+      
+      stats.test <- t.test(df)
+      str <- paste("Based on the sample with size of", nrow(df))
+      str <- paste(str, "the population mean of", input$match.player.metric.select ,"is", round(stats.test$estimate, 2))
+      str <- paste(str, "with a confidence interval of", round(stats.test$conf.int[[1]], 2), "to", round(stats.test$conf.int[[2]], 2))
+      str <- paste(str, "at confidence level of 95%.")
+      str
+    }
+  })
+  
+  output$match.player.metrics.control <- renderUI({
+    if (length(match.data$processed.match.player.data) > 0) {
+      names <- colnames(player_metric_df())
+      #print(match.data$processed.match.data)
+      div(
+        div(style = "display:inline-block; vertical-align:top;", selectInput(ns("match.player.metric.select"), "Metric", names)),
+        div(style = "display:inline-block; vertical-align:top;", sliderInput(ns("match.player.metric.bin"), "Bins", 5, 50, 10)),
+        plotOutput(ns("match.player.metric.plot")),
+        h4(textOutput(ns("match.player.metric.population.mean")))
+        #div(style = "display:inline-block; vertical-align:top;", textInput(ns("match.player.metric.testing"), "Input your own value")),
+        #div(style = "display:inline-block; vertical-align:top;", actionButton(ns("match.player.metric.compare")), "Compare")
+      )
+    }
+  })
+  
+  output$match.player.metric.plot <- renderPlot({
+    if (length(match.data$processed.match.player.data) > 0) {
+      player_metric_df() %>%
+        ggplot() +
+        geom_histogram(aes_string(x = input$match.player.metric.select), bins = input$match.player.metric.bin) +
+        xlab(input$match.player.metric.select) + ylab("value")
+    }
+  })
+  
+  output$match.player.metric.population.mean <- renderText({
+    if (length(match.data$processed.match.player.data) > 0) {
+      df <- player_metric_df()
+      df <- df[,input$match.player.metric.select]
+      #df <- df[!is.na(df),]
+      
+      stats.test <- t.test(df)
+      str <- paste("Based on the sample with size of", length(df))
+      str <- paste(str, "the population mean of", input$match.player.metric.select ,"is", round(stats.test$estimate, 2))
+      str <- paste(str, "with a confidence interval of", round(stats.test$conf.int[[1]], 2), "to", round(stats.test$conf.int[[2]], 2))
+      str <- paste(str, "at confidence level of 95%.")
+      str
+    }
+  })
+  
+  output$match.player.metric.comparision <- reactiveText({})
 }
 
 ###############################################################################
@@ -268,7 +344,10 @@ mathes.panel <- tabPanel(
   title = "Matches",
   fluidRow(
     column(3, match_search_Input(PANEL.NAMESPACE)),
-    column(9, match_overall_Input(PANEL.NAMESPACE))
+    column(9,
+           match_overall_Input(PANEL.NAMESPACE),
+           match_player_metrics_Input(PANEL.NAMESPACE))
+    
     #column(10, h2("Data Table"), dataTableOutput("table"))#,
     #column(7, h2("Graphical Plot"))
   )
@@ -289,6 +368,7 @@ matches.panel.server <- substitute({
   
   callModule(match_search, PANEL.NAMESPACE, match.data)
   callModule(match_overall, PANEL.NAMESPACE, match.data)
+  callModule(match_player_metrics, PANEL.NAMESPACE, match.data)
 })
 
 # call this function to add your server logic

@@ -156,8 +156,10 @@ process_match_data <- function(match) {
 
 process_kills <- function(killed, creeps = c()) {
   kills <- 0
+  #print(killed)
   for (creep in creeps) {
-    if (!is.null(killed[[creep]]) && !is.na(killed[[creep]])) {
+    #print(creep)
+    if (!is.null(killed$creep) && !is.na(killed$creep)) {
       kills <- kills + as.integer(killed[[creep]])
     }
   }
@@ -648,15 +650,16 @@ get_match_and_player_details_by_conditions <- function (limit = 30, start.date =
     conditional.sql <- paste(conditional.sql, "LIMIT", limit)
   }
   
-  #inner.sql <- paste("SELECT * from matches WHERE", conditional.sql)
+  inner.sql <- paste("SELECT * from matches", conditional.sql)
   
-  sql <- "SELECT player_matches.*, matches.*, leagues.leagueid, leagues.name as league_name FROM matches"
-  
-  #sql <- paste(sql, "LEFT JOIN player_matches ON player_matches.match_id = matches.match_id")
-  sql <- paste(sql, "LEFT JOIN player_matches ON player_matches.match_id = matches.match_id")
+  sql <- "SELECT player_matches.*, matches.*, leagues.leagueid, leagues.name as league_name FROM player_matches"
+  sql <- paste(sql, "INNER JOIN (", inner.sql, ") matches on (player_matches.match_id=matches.match_id)")
   sql <- paste(sql, "LEFT JOIN leagues ON matches.leagueid = leagues.leagueid")
+  #sql <- paste(sql, "LEFT JOIN player_matches ON player_matches.match_id = matches.match_id")
+  #sql <- paste(sql, "LEFT JOIN player_matches ON player_matches.match_id = matches.match_id")
+  #sql <- paste(sql, "LEFT JOIN leagues ON matches.leagueid = leagues.leagueid")
   #sql <- paste(sql, "LEFT JOIN match_gcdata ON matches.match_id = match_gcdata.match_id")
-  sql <- paste(sql, conditional.sql)
+  #sql <- paste(sql, conditional.sql)
   
   
   out <- get_by_sql(sql)
@@ -665,8 +668,9 @@ get_match_and_player_details_by_conditions <- function (limit = 30, start.date =
   }
   
   match.data <- list()
-  for(i in 1:nrow(out$rows)) {
-    match.data[[i]] <- process_match_data(out$rows[i,])
+  unique.matchs <- out$rows[!duplicated(out$rows$match_id),]
+  for(i in 1:nrow(unique.matchs)) {
+    match.data[[i]] <- process_match_data(unique.matchs[i,])
   }
   
   player.match.details <- list()
