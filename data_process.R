@@ -696,3 +696,5 @@ get_match_and_player_details_by_conditions <- function (limit = 30, start.date =
 if (use.dpc) {
   json <- debug_load_test_dataset()
 }
+
+HEROES.INFO <- get_all_heroes_info()

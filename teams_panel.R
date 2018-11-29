@@ -237,15 +237,21 @@ team_match_heros <- function (input, output, session, team.profile) {
     if (length(team.profile$team.pickbans) > 0 && !team.profile$team.pickbans$nomatches) {
       print("team.match.hero.appearance.plot")
       total.match.count <- length(unique(team.profile$team.pickbans$draft.picks$match.id))
-      pick_bans_df() %>%
+      df <- pick_bans_df()
+      df$hero.names <- HEROES.INFO$localized_name[df$hero_id-1]
+      #hero.type <- unlist(lapply(HEROES.INFO$roles[df$hero_id-1], function (x) x[1]), recursive = F)
+      #print(hero.type)
+      #df$hero.types <- hero.type
+      print(df)
+      df %>%
         filter(pick == T) %>%
-        group_by(hero_id) %>%
+        group_by(hero_id, hero.names) %>%
         summarise(picked.count = n(),
                   appearance.rate = n() / total.match.count) %>%
         arrange(desc(appearance.rate)) %>%
         top_n(10, appearance.rate) %>%
         ggplot() +
-        geom_col(aes(x = as.factor(hero_id), y = appearance.rate)) +
+        geom_col(aes(x = as.factor(hero.names), y = appearance.rate)) +
         xlab("Hero") + ylab("Appearance Rate") +
         scale_y_continuous(labels = scales::percent_format(accuracy = 1))
     }

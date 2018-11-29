@@ -266,7 +266,8 @@ match_overall <- function(input, output, session, match.data) {
       total.wins <- sum(df$wins)
       df$win.rate <- df$wins / total.wins
       ggplot(df) +
-        geom_col(aes(x = faction, y = win.rate))
+        geom_col(aes(x = faction, y = win.rate)) +
+        scale_y_continuous(labels = scales::percent)
     }
   })
   
