@@ -43,7 +43,7 @@ source("matches_panel.R", local = T)
 # Page UI
 ###############################################################################
 ui <- shiny::fluidPage(
-  fluidRow(h1("Dota 2 Analyics Tool")),
+  fluidRow(h1("Dota 2 Analytics Tool")),
   do.call(tabsetPanel, PANELS)
 )
 

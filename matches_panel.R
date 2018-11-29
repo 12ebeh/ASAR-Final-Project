@@ -55,18 +55,27 @@ match_search <- function(input, output, session, match.data) {
     end.date <- ymd_hms(input$match.search.ui.end.date)
     team.id <- as.integer(input$match.search.ui.team.id)
     match.ids <- as.character(input$match.search.ui.match.id)
-    #print(match.ids)
+    print(paste("match id:", match.ids))
+    
     if (match.ids != "") {
-      match.ids <- unlist(strsplit(match.ids, ","))
-      match.ids <- lapply(match.ids, function(x) {
-        as.integer(x)
-      })
-      match.ids <- match.ids[!is.na(match.ids)]
+      match.ids <- unlist(strsplit(match.ids, ","), recursive = F)
+      print(match.ids)
+      match.ids <- as.numeric(match.ids)
+      print(match.ids)
+      #if (class(match.ids) != "list") {
+        #match.ids = list(match.ids)
+      #}
+      print(match.ids)
     } else {
       match.ids <- list()
     }
     
-    print("debug")
+    print(match.count)
+    print(start.date)
+    print(end.date)
+    print(team.id)
+    print(match.ids)
+    
     match.data$search.match.data <- list()
     df.all <- get_match_and_player_details_by_conditions(limit = match.count, start.date = start.date, end.date = end.date, team.id = team.id, match.id.list = match.ids)
     
@@ -96,8 +105,8 @@ match_search <- function(input, output, session, match.data) {
     #test2 <-
       data.table::rbindlist(fill = T, lapply(found.matches, function (x) {
         pick.team.id <- ifelse(x$radiant.team.id == team.id, 2, 3)
-        
-        if (nrow(x$draft.picks) == 0) {
+        #print(x)
+        if (ncol(x$draft.picks) == 0 || nrow(x$draft.picks) == 0) {
           draft.picks <- data.frame(match.id = NA)
           return (draft.picks)
         }
@@ -111,7 +120,7 @@ match_search <- function(input, output, session, match.data) {
     match.data$processed.match.data$objectives <- 
     #test3 <-
       data.table::rbindlist(fill = T, lapply(found.matches, function (x) {
-        if (nrow(x$objectives) == 0) {
+        if (ncol(x$objectives) == 0 || nrow(x$objectives) == 0) {
           objectives <- data.frame(match.id = NA)
           return (objectives)
         }
@@ -124,7 +133,7 @@ match_search <- function(input, output, session, match.data) {
     match.data$processed.match.data$gold.xp.adv <-
     #test4 <-
       data.table::rbindlist(fill = T, lapply(found.matches, function (x) {
-        if (nrow(x$gold.xp.adv) == 0) {
+        if (ncol(x$gold.xp.adv) == 0 || nrow(x$gold.xp.adv) == 0) {
           gold.xp.adv <- data.frame(match.id = NA)
           return (gold.xp.adv)
         }
@@ -153,7 +162,7 @@ match_search <- function(input, output, session, match.data) {
     match.data$processed.match.player.data$player.purchase.log <-
     #player.test2 <- 
       data.table::rbindlist(fill = T, lapply(found.matches.player.data, function (x) {
-        if (nrow(x$purchase.log) == 0) {
+        if (ncol(x$purchase.log) == 0 || nrow(x$purchase.log) == 0) {
           purchase.log <- data.frame(match.id = NA)
           return (purchase.log)
         }
@@ -167,7 +176,7 @@ match_search <- function(input, output, session, match.data) {
     match.data$processed.match.player.data$player.runes.log <-
     #player.test3 <- 
       data.table::rbindlist(fill = T, lapply(found.matches.player.data, function (x) {
-        if (nrow(x$runes.log) == 0) {
+        if (ncol(x$runes.log) == 0 || nrow(x$runes.log) == 0) {
           runes.log <- data.frame(match.id = NA)
           return (runes.log)
         }
@@ -181,7 +190,7 @@ match_search <- function(input, output, session, match.data) {
     match.data$processed.match.player.data$player.purchase.log <-
     #player.test4 <-
       data.table::rbindlist(fill = T, lapply(found.matches.player.data, function (x) {
-        if (nrow(x$metrics_t) == 0) {
+        if (ncol(x$metrics_t) == 0 || nrow(x$metrics_t) == 0) {
           metrics_t <- data.frame(match.id = NA)
           return (metrics_t)
         }
@@ -195,7 +204,7 @@ match_search <- function(input, output, session, match.data) {
     match.data$processed.match.player.data$player.abiliies.upgrade <-
     #player.test5 <-
       data.table::rbindlist(fill = T, lapply(found.matches.player.data, function (x) {
-        if (nrow(x$abilities.upgrade) == 0) {
+        if (ncol(x$abilities.upgrade) == 0 || nrow(x$abilities.upgrade) == 0) {
           abilities.upgrade <- data.frame(match.id = NA)
           return (abilities.upgrade)
         }
@@ -333,7 +342,7 @@ match_player_metrics <- function(input, output, session, match.data) {
     }
   })
   
-  output$match.player.metric.comparision <- reactiveText({})
+  #output$match.player.metric.comparision <- reactiveText({})
 }
 
 ###############################################################################

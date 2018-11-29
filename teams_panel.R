@@ -62,7 +62,7 @@ teams_search <- function(input, output, session, team.profile) {
     df <- teams_df()
     select.list <- setNames(df$team_id, as.character(df$name))
 
-    selectInput(ns("teams.list"), label = "Team ID", select.list)
+    selectInput(ns("teams.list"), label = "Team Name", select.list)
   })
   
   observeEvent(input$team.search, {
@@ -91,6 +91,7 @@ team_data <- function (input, output, session, team.profile) {
       div(
         h2(team.profile$team.data$name),
         img(src = team.profile$team.data$logo_url, style = "background-color:lightgrey;"),
+        h3(paste("Team ID:", team.profile$team.data$team_id)),
         h3(paste("Rating:", round(team.profile$team.data$rating))),
         h3(paste("Wins:", team.profile$team.data$wins, "Loss:", team.profile$team.data$losses, "Win Rate:", winrate)),
         hr()
@@ -101,6 +102,7 @@ team_data <- function (input, output, session, team.profile) {
   output$team.players <- renderUI({
     if (length(team.profile$team.players) > 0) {
       div(
+        h2("Team Members"),
         dataTableOutput(ns("team.players.df")),
         hr()
       )

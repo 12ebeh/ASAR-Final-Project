@@ -125,26 +125,17 @@ process_match_data <- function(match) {
   } else {
     match.data$gold.xp.adv$min <- NULL
   }
-  match.data$draft.picks <- 
+  match.data$draft.picks <-
     if (is.null(match$draft_timings) || is.na(match$draft_timings)) {
-      #print("case 1")
-      NA
+      data.frame()
     } else if (class(match$draft_timings) == "data.frame") {
-      #print("case 2")
       match$draft_timings
     } else {
-      #print("case 3")
-      #print(match$draft_timings)
       as.data.frame(match$draft_timings)
-      #data.table::rbindlist(
-        #lapply(match$draft_timings,
-               #function (x) lapply(x, function (y) ifelse(is.null(y), NA, y))
-        #)
-      #)
     }
   match.data$objectives <-
     if (is.null(match$objectives) || is.na(match$objectives)) {
-      NA
+      data.frame()
     } else if(class(match$objectives) == "data.frame") {
       match$objectives
     } else {
@@ -156,7 +147,11 @@ process_match_data <- function(match) {
 
 process_kills <- function(killed, creeps = c()) {
   kills <- 0
-  #print(killed)
+  
+  if (is.null(killed) || is.na(killed) || length(killed) <= 0) {
+    return (kills)
+  }
+  
   for (creep in creeps) {
     #print(creep)
     if (!is.null(killed$creep) && !is.na(killed$creep)) {
@@ -214,30 +209,47 @@ process_match_player_data <- function(player, match.starttime, match.duration, m
                                                 as.integer(rowSums(player$actions, na.rm = T) * 60 / match.duration), NA))
   player.data$last.hits <- player$last_hits #y
   player.data$denies <- player$denies #y
-  player.data$lane.kills <- ifelse(!is.null(player$lane_kills), player$lane_kills,
-                                   process_kills(player$killed, LANE.CREEPS))
-  player.data$hero.kills <- ifelse(!is.null(player$hero_kills), player$hero_kills, player$kills)
-  player.data$neutral.kills <- ifelse(!is.null(player$neutral_kills), player$neutral_kills,
-                                      process_kills(player$killed, NEUTRAL.CREEPS))
-  player.data$tower.kills <- ifelse(!is.null(player$tower_kills), player$tower_kills, player$towers_killed)
-  player.data$courier.kills <- ifelse(!is.null(player$courier_kills), player$courier_kills,
-                                      ifelse(is.null(player$killed$npc_dota_courier) || is.na(player$killed$npc_dota_courier),
-                                             0, player$killed$npc_dota_courier))
-  player.data$necronomicon.kills <- ifelse(!is.null(player$necronomicon_kills), player$necronomicon_kills,
-                                           process_kills(player$killed, NECRONOMICON.CREEPS)) 
-  player.data$ancient.kills <- ifelse(!is.null(player$ancient_kills), player$ancient_kills,
-                                      process_kills(player$killed, ANCIENT.CREEPS))
-  player.data$sentry.kills <- ifelse(!is.null(player$sentry_kills), player$sentry_kills,
-                                     ifelse(is.na(player$killed$npc_dota_sentry_wards) || is.na(player$killed$npc_dota_sentry_wards),
-                                            0, player$killed$npc_dota_sentry_wards))
-  player.data$observer.kills <- ifelse(!is.null(player$observer_kills), player$observer_kills,
-                                       ifelse(is.null(player$killed$npc_dota_observer_wards) || is.na(player$killed$npc_dota_observer_wards),
-                                              0, player$killed$npc_dota_observer_wards))
-  player.data$roshan.kills <- ifelse(!is.null(player$roshan_kills), player$roshan_kills, player$roshans_killed)
+
+  if (class(player$killed) != "data.frame" || ncol(player$killed) == 0 || nrow(player$killed) == 0) {
+  #if (is.null(player$killed) || is.na(player$killed)) {
+    player.data$lane.kills <- ifelse(!is.null(player$lane_kills), player$lane_kills, 0)
+    player.data$hero.kills <- ifelse(!is.null(player$hero_kills), player$hero_kills, player$kills)
+    player.data$neutral.kills <- ifelse(!is.null(player$neutral_kills), player$neutral_kills, 0)
+    player.data$tower.kills <- ifelse(!is.null(player$tower_kills), player$tower_kills, player$towers_killed)
+    player.data$courier.kills <- ifelse(!is.null(player$courier_kills), player$courier_kills, 0)
+    player.data$necronomicon.kills <- ifelse(!is.null(player$necronomicon_kills), player$necronomicon_kills, 0)
+    player.data$ancient.kills <- ifelse(!is.null(player$ancient_kills), player$ancient_kills, 0)
+    player.data$sentry.kills <- ifelse(!is.null(player$sentry_kills), player$sentry_kills, 0)
+    player.data$observer.kills <- ifelse(!is.null(player$observer_kills), player$observer_kills, 0)
+    player.data$roshan.kills <- ifelse(!is.null(player$roshan_kills), player$roshan_kills, player$roshans_killed)
+  } else {
+    player.data$lane.kills <- ifelse(!is.null(player$lane_kills), player$lane_kills,
+                                     process_kills(player$killed, LANE.CREEPS))
+    player.data$hero.kills <- ifelse(!is.null(player$hero_kills), player$hero_kills, player$kills)
+    player.data$neutral.kills <- ifelse(!is.null(player$neutral_kills), player$neutral_kills,
+                                        process_kills(player$killed, NEUTRAL.CREEPS))
+    player.data$tower.kills <- ifelse(!is.null(player$tower_kills), player$tower_kills, player$towers_killed)
+    player.data$courier.kills <- ifelse(!is.null(player$courier_kills), player$courier_kills,
+                                        ifelse(is.null(player$killed$npc_dota_courier) || is.na(player$killed$npc_dota_courier),
+                                               0, player$killed$npc_dota_courier))
+    player.data$necronomicon.kills <- ifelse(!is.null(player$necronomicon_kills), player$necronomicon_kills,
+                                             process_kills(player$killed, NECRONOMICON.CREEPS)) 
+    player.data$ancient.kills <- ifelse(!is.null(player$ancient_kills), player$ancient_kills,
+                                        process_kills(player$killed, ANCIENT.CREEPS))
+    player.data$sentry.kills <- ifelse(!is.null(player$sentry_kills), player$sentry_kills,
+                                       ifelse(is.na(player$killed$npc_dota_sentry_wards) || is.na(player$killed$npc_dota_sentry_wards),
+                                              0, player$killed$npc_dota_sentry_wards))
+    player.data$observer.kills <- ifelse(!is.null(player$observer_kills), player$observer_kills,
+                                         ifelse(is.null(player$killed$npc_dota_observer_wards) || is.na(player$killed$npc_dota_observer_wards),
+                                                0, player$killed$npc_dota_observer_wards))
+    player.data$roshan.kills <- ifelse(!is.null(player$roshan_kills), player$roshan_kills, player$roshans_killed)
+  }
+  
+  
   player.data$stuns <- ifelse(!is.null(player$stuns), player$stuns, NA) #y
   player.data$purchase.log <- 
     if (is.null(player$purchase_log) || is.na(player$purchase_log)) {
-      NA
+      data.frame()
   } else if (class(player$purchase_log) == "data.frame") {
     player$purchase_log
   } else {
@@ -245,7 +257,7 @@ process_match_player_data <- function(player, match.starttime, match.duration, m
   }
   player.data$runes.log <- 
     if (is.null(player$runes_log) || is.na(player$runes_log)) {
-      NA
+      data.frame()
     } else if (class(player$runes_log) == "data.frame") {
       player$runes_log
     } else {
